@@ -31,35 +31,35 @@ async function parseConfigFile(path) {
             }
         }
 
-        Object.keys(devices).forEach(k => {
-            Object.keys(config[k]).forEach(s => {
-                let stream = fs.createWriteStream(s + '.txt');
-                let newState = {
-                    'stream': stream
-                }
-                sensorConfig[s].csvHeader(stream);
-                MetaWear.mbl_mw_datasignal_subscribe(sensorConfig[s].signal(devices[k].board), MetaWear.FnVoid_DataP.toPointer(pointer => {
-                    sensorConfig[s].writeValue(pointer.deref(), newState);
-                }));
-
-                states.push(newState);
-            });
-            Object.keys(config[k]).forEach(s => {
-                console.log("ODR = " + config[k][s]);
-                sensorConfig[s].configure(devices[k].board, config[k][s]);
-                sensorConfig[s].start(devices[k].board);
-                console.log("Starting " + k);
-            });
-        })
-        
-        process.openStdin().addListener("data", data => {
+        setTimeout(() => {
             Object.keys(devices).forEach(k => {
-                MetaWear.mbl_mw_debug_reset(devices[k].board);
+                Object.keys(config[k]).forEach(s => {
+                    let stream = fs.createWriteStream(s + '.txt');
+                    let newState = {
+                        'stream': stream
+                    }
+                    sensorConfig[s].csvHeader(stream);
+                    MetaWear.mbl_mw_datasignal_subscribe(sensorConfig[s].signal(devices[k].board), MetaWear.FnVoid_DataP.toPointer(pointer => {
+                        sensorConfig[s].writeValue(pointer.deref(), newState);
+                    }));
+    
+                    states.push(newState);
+                });
+                Object.keys(config[k]).forEach(s => {
+                    sensorConfig[s].configure(devices[k].board, config[k][s]);
+                    sensorConfig[s].start(devices[k].board);
+                });
+            })
+            
+            process.openStdin().addListener("data", data => {
+                Object.keys(devices).forEach(k => {
+                    MetaWear.mbl_mw_debug_reset(devices[k].board);
+                });
+                states.forEach(s => s['stream'].end());
+                process.exit(0)
             });
-            states.forEach(s => s['stream'].end());
-            process.exit(0)
-        });
-        console.log("Streaming data to host device. Press any key to terminate...");
+            console.log("Streaming data to host device. Press any key to terminate...");
+        }, 1000);
     } catch (e) {
         console.log(e);
         process.exit(1);
