@@ -31,7 +31,6 @@ async function parseConfigFile(path) {
             }
         }
 
-        console.log("How many devices I got? " + Object.keys(devices).length);
         Object.keys(devices).forEach(k => {
             Object.keys(config[k]).forEach(s => {
                 let stream = fs.createWriteStream(s + '.txt');
@@ -42,7 +41,6 @@ async function parseConfigFile(path) {
                 MetaWear.mbl_mw_datasignal_subscribe(sensorConfig[s].signal(devices[k].board), MetaWear.FnVoid_DataP.toPointer(pointer => {
                     sensorConfig[s].writeValue(pointer.deref(), newState);
                 }));
-                console.log("Subscribed to " + k);
 
                 states.push(newState);
             });
@@ -54,13 +52,14 @@ async function parseConfigFile(path) {
             });
         })
         
-        setTimeout(() => {
+        process.openStdin().addListener("data", data => {
             Object.keys(devices).forEach(k => {
                 MetaWear.mbl_mw_debug_reset(devices[k].board);
             });
             states.forEach(s => s['stream'].end());
             process.exit(0)
-        }, 30000);
+        });
+        console.log("Streaming data to host device. Press any key to terminate...");
     } catch (e) {
         console.log(e);
         process.exit(1);
