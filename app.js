@@ -1,13 +1,18 @@
 var MetaWear = require('metawear');
 const sensorConfig = require('./lib/sensor-config.js');
-var fs = require('fs');
+const fs = require('fs');
+const path = require('path');
+const util = require("util");
+const moment = require("moment");
 
-var states = []
-var devices = {}
-async function parseConfigFile(path) {
+const CSV_DIR = "csv";
+var states = [];
+var devices = {};
+
+async function parseConfigFile(configJson) {
     try {
         let config = await new Promise((resolve, reject) => {
-            fs.readFile(path, 'utf8', function (err, data) {
+            fs.readFile(configJson, 'utf8', function (err, data) {
                 if (err) reject(err);
                 resolve(JSON.parse(data));
             });
@@ -32,9 +37,10 @@ async function parseConfigFile(path) {
         }
 
         setTimeout(() => {
+            var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
             Object.keys(devices).forEach(k => {
                 Object.keys(config[k]).forEach(s => {
-                    let stream = fs.createWriteStream(s + '.txt');
+                    let stream = fs.createWriteStream(path.join(CSV_DIR, util.format("%s_%s_%s.csv", now, k.replace(/:/g, ""), s)));
                     let newState = {
                         'stream': stream
                     }
@@ -66,4 +72,7 @@ async function parseConfigFile(path) {
     }
 }
 
+if (!fs.existsSync(CSV_DIR)){
+    fs.mkdirSync(CSV_DIR);
+}
 parseConfigFile(process.argv[2]);
