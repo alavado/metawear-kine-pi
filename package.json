@@ -4,6 +4,7 @@
   "description": "Stream and log data from MbientLab's sensor boards to your MetaHub",
   "main": "index.js",
   "scripts": {
+    "start": "sudo node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -18,6 +19,7 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/mbientlab/metabase-hub#readme",
   "dependencies": {
-    "metawear": "^0.1.0"
+    "metawear": "^0.1.0",
+    "moment": "^2.19.1"
   }
 }
