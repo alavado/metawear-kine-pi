@@ -21,8 +21,8 @@
   "dependencies": {
     "argparse": "^1.0.9",
     "metacloud": "^0.1.1",
-    "metawear": "^0.1.0",
-    "moment": "^2.19.1",
+    "metawear": "^0.1.1",
+    "moment": "^2.19.2",
     "winston": "^2.4.0"
   }
 }
