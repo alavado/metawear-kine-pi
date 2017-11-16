@@ -12,31 +12,45 @@ var parser = new ArgumentParser({
     addHelp:true,
     description: 'NodeJS app to stream sensor data to MetaHub'
 });
-parser.addArgument([ '-d', '--device' ],
-    {
-        help: 'MAC address of the device to use',
-        action: 'append',
-        metavar: 'mac',
-        type: "string"
-    }
-);
-parser.addArgument([ '--sensor' ],
-    {
-        help: 'Key-value pair that sets a sensors sampling frequency',
-        action: 'append',
-        metavar: 'sensor=freq'
-    }
-);
-parser.addArgument(['--config'],
-    {
-        help: 'Path to the config file to load',
-        metavar: 'path'
-    }
-);
+parser.addArgument([ '-d', '--device' ], {
+    help: 'MAC address of the device to use',
+    action: 'append',
+    metavar: 'mac',
+    type: "string"
+});
+parser.addArgument([ '--sensor' ], {
+    help: 'Key-value pair that sets a sensors sampling frequency',
+    action: 'append',
+    metavar: 'sensor=freq'
+});
+parser.addArgument(['--config'], {
+    help: 'Path to the config file to load',
+    metavar: 'path'
+});
+parser.addArgument(['--disable-cloud-sync'], {
+    nargs: 0,
+    help: 'Do not sync data to MetaCloud',
+    metavar: 'path'
+});
+parser.addArgument(['--cloud-user'], {
+    help: 'MetaCloud user name',
+    metavar: 'name'
+});
+parser.addArgument(['--cloud-passwd'], {
+    help: 'MetaCloud password',
+    metavar: 'pw'
+});
 
 var args = parser.parseArgs();
-var config;
+var config, Session;
 
+if (args['disable_cloud_sync'] == null) {
+    if (args['cloud_user'] == null || args['cloud_passwd'] == null) {
+        winston.error("'--cloud-user' and '--cloud-passwd' required to sync to MetaCloud, use '--disable-cloud-sync' to disable")
+        process.exit(0)
+    }
+    Session = require('metacloud').Session;
+}
 if (args['config'] != null) {
     config = JSON.parse(fs.readFileSync(args['config'], 'utf8'));
 } else if (args['device'] != null && args['sensor'] != null) {
@@ -74,6 +88,7 @@ function findDevice(mac) {
     });
 }
 
+var sessions = [];
 var states = [];
 var devices = [];
 (async function start() {
@@ -107,6 +122,12 @@ var devices = [];
     setTimeout(() => {
         var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
         devices.forEach(d => {
+            var session = null;
+            if (args['disable_cloud_sync'] == null) {
+                session = Session.create(d.firmwareRevision, d.address, d.modelDescription, 'Device #1', 'MetaBase', '1.0.0');
+                sessions.push(session);
+            }
+
             Object.keys(config['sensors']).forEach(s => {
                 if (!(s in sensorConfig)) {
                     winston.warn(util.format("'%s' is not a valid sensor name", s));
@@ -122,6 +143,9 @@ var devices = [];
                         sensorConfig[s].writeValue(pointer.deref(), newState);
                     }));
     
+                    if (session != null) {
+                        newState['session'] = session;
+                    }
                     states.push(newState);
                 }
             });
@@ -131,8 +155,25 @@ var devices = [];
             });
         })
         
-        process.openStdin().addListener("data", data => {
+        process.openStdin().addListener("data", async data => {
             devices.forEach(d => MetaWear.mbl_mw_debug_reset(d.board));
+
+            if (args['disable_cloud_sync'] == null) {
+                winston.info("Syncing data to MetaCloud");
+            }
+            for(let s of sessions) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        s.sync(args['cloud_user'], args['cloud_passwd'], (error, result) => {
+                            if (error == null) resolve(result)
+                            else reject(error);
+                        });
+                    });
+                } catch (e) {
+                    winston.warn("Could not sync data to metacloud", { 'error': error });
+                }
+            }
+
             states.forEach(s => s['stream'].end());
             process.exit(0)
         });
