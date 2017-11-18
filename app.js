@@ -27,11 +27,6 @@ parser.addArgument(['--config'], {
     help: 'Path to the config file to load',
     metavar: 'path'
 });
-parser.addArgument(['--disable-cloud-sync'], {
-    nargs: 0,
-    help: 'Do not sync data to MetaCloud',
-    metavar: 'path'
-});
 parser.addArgument(['--cloud-user'], {
     help: 'MetaCloud user name',
     metavar: 'name'
@@ -42,26 +37,34 @@ parser.addArgument(['--cloud-passwd'], {
 });
 
 var args = parser.parseArgs();
-var config, Session;
+var config, Session = null;
 
-if (args['disable_cloud_sync'] == null) {
-    if (args['cloud_user'] == null || args['cloud_passwd'] == null) {
-        winston.error("'--cloud-user' and '--cloud-passwd' required to sync to MetaCloud, use '--disable-cloud-sync' to disable")
-        process.exit(0)
-    }
-    Session = require('metacloud').Session;
-}
 if (args['config'] != null) {
     config = JSON.parse(fs.readFileSync(args['config'], 'utf8'));
-} else if (args['device'] != null && args['sensor'] != null) {
-    config = { "devices": args['device'], "sensors": {} };
-    args['sensor'].forEach(s => {
-        const parts = s.split("=");
-        config["sensors"][parts[0]] = parseFloat(parts[1]);
-    });
 } else {
-    winston.error("either '--config' or '-d' & '-s' options must be used");
-    process.exit(0);
+    if (args['device'] != null && args['sensor'] != null) {
+        config = { "devices": args['device'], "sensors": {} };
+        args['sensor'].forEach(s => {
+            const parts = s.split("=");
+            config["sensors"][parts[0]] = parseFloat(parts[1]);
+        });
+    } else {
+        winston.error("either '--config' or '--device' & '--sensor' options must be used");
+        process.exit(0);
+    }
+    if (args['cloud_user'] != null && args['cloud_passwd'] != null) {
+        config["cloudLogin"] = {
+            "username" : args['cloud_user'],
+            "password" : args['cloud_passwd']
+        }
+    } else if (!(args['cloud_user'] == null && args['cloud_passwd'] == null)) {
+        winston.error("'--cloud-user' and '--cloud-passwd' required to sync to MetaCloud");
+        process.exit(0);
+    }
+}
+
+if ('cloudLogin' in config) {
+    Session = require('metacloud').Session;
 }
 
 const CSV_DIR = "output";
@@ -123,7 +126,7 @@ var devices = [];
         var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
         devices.forEach(d => {
             var session = null;
-            if (args['disable_cloud_sync'] == null) {
+            if (Session != null) {
                 session = Session.create(d.firmwareRevision, d.address, d.modelDescription, 'Device #1', 'MetaBase', '1.0.0');
                 sessions.push(session);
             }
@@ -158,13 +161,13 @@ var devices = [];
         process.openStdin().addListener("data", async data => {
             devices.forEach(d => MetaWear.mbl_mw_debug_reset(d.board));
 
-            if (args['disable_cloud_sync'] == null) {
+            if ('cloudLogin' in config) {
                 winston.info("Syncing data to MetaCloud");
             }
             for(let s of sessions) {
                 try {
                     await new Promise((resolve, reject) => {
-                        s.sync(args['cloud_user'], args['cloud_passwd'], (error, result) => {
+                        s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
                             if (error == null) resolve(result)
                             else reject(error);
                         });
