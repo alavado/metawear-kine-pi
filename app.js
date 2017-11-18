@@ -35,6 +35,10 @@ parser.addArgument(['--cloud-passwd'], {
     help: 'MetaCloud password',
     metavar: 'pw'
 });
+parser.addArgument(['-o'], {
+    help: 'Path to store the CSV files',
+    metavar: 'path'
+});
 
 var args = parser.parseArgs();
 var config, Session = null;
@@ -67,7 +71,7 @@ if ('cloudLogin' in config) {
     Session = require('metacloud').Session;
 }
 
-const CSV_DIR = "output";
+const CSV_DIR = args['o'] != null ? args['o'] : "output";
 if (!fs.existsSync(CSV_DIR)){
     fs.mkdirSync(CSV_DIR);
 }
