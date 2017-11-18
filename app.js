@@ -167,20 +167,21 @@ var devices = [];
 
             if ('cloudLogin' in config) {
                 winston.info("Syncing data to MetaCloud");
-            }
-            for(let s of sessions) {
-                try {
-                    await new Promise((resolve, reject) => {
-                        s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
-                            if (error == null) resolve(result)
-                            else reject(error);
+                for(let s of sessions) {
+                    try {
+                        await new Promise((resolve, reject) => {
+                            s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
+                                if (error == null) resolve(result)
+                                else reject(error);
+                            });
                         });
-                    });
-                } catch (e) {
-                    winston.warn("Could not sync data to metacloud", { 'error': error });
+                    } catch (e) {
+                        winston.warn("Could not sync data to metacloud", { 'error': error });
+                    }
                 }
+                winston.info("Syncing completed");
             }
-
+            
             states.forEach(s => s['stream'].end());
             process.exit(0)
         });
