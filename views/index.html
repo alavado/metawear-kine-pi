@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+  </head>
+  <body>
+    <div id="chart"></div>
+
+    <script>
+      const ipc = require('electron').ipcRenderer
+      global.jQuery = require('jquery')
+      global.d3 = require('d3');
+      var Rickshaw = require('rickshaw');
+
+      let url = new URL(window.location);
+      let params = new URLSearchParams(url.search.substring(1));
+      let mac = params.get('mac');
+
+      let now = new Date().getTime();
+      var graph = new Rickshaw.Graph( {
+            element: document.querySelector("#chart"),
+            min: -16.0,
+            max: 16.0,
+            width: 580,
+            height: 250,
+            renderer: 'line',
+            series: new Rickshaw.Series.FixedDuration([
+              { name: 'xaxis', color: 'red' },
+              { name: 'yaxis', color: 'green' },
+              { name: 'zaxis', color: 'blue' }
+              ], undefined, {
+                timeInterval: 42,
+                maxDataPoints: 240,
+                timeBase: now / 1000
+              }
+            )
+      });
+      graph.render();
+
+      let lastUpdate = now;
+      ipc.on(`update-Accelerometer-${mac.toLowerCase()}`, function (event, arg) {
+        let parts = arg.split(",");
+        graph.series.addData({'xaxis': parts[3], 'yaxis': parts[4], 'zaxis': parts[5]});
+
+        let now = new Date().getTime()
+        if (now - lastUpdate >= 42) {
+          lastUpdate = now;
+          graph.render();
+        }
+      })
+    </script>
+  </body>
+</html>

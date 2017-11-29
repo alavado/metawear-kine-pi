@@ -7,6 +7,13 @@ var moment = require("moment");
 var winston = require('winston');
 var ArgumentParser = require('argparse').ArgumentParser;
 
+const electron = require('electron')
+// Module to control application life.
+const app = electron.app
+// Module to create native browser window.
+const BrowserWindow = electron.BrowserWindow
+const url = require('url')
+
 var parser = new ArgumentParser({
     version: '1.0.0',
     addHelp:true,
@@ -76,6 +83,59 @@ if (!fs.existsSync(CSV_DIR)){
     fs.mkdirSync(CSV_DIR);
 }
 
+// Keep a global reference of the window object, if you don't, the window will
+// be closed automatically when the JavaScript object is garbage collected.
+var windows = {}
+
+function createWindow () {
+    config['devices'].forEach(mac => {
+    // Create the browser window.
+    let newWindow = new BrowserWindow({width: 800, height: 600})
+    windows[mac.toLowerCase()] = newWindow;
+
+    // and load the index.html of the app.
+    newWindow.loadURL(url.format({
+      pathname: path.join(__dirname, 'views', 'index.html'),
+      protocol: 'file:',
+      slashes: true,
+      search: `mac=${mac}`
+    }))
+
+    // Open the DevTools.
+    // mainWindow.webContents.openDevTools()
+
+    // Emitted when the window is closed.
+    newWindow.on('closed', function () {
+      delete windows[mac.toLowerCase()]
+      // Dereference the window object, usually you would store windows
+      // in an array if your app supports multi windows, this is the time
+      // when you should delete the corresponding element.
+      newWindow = null
+    })
+  });
+}
+
+// Quit when all windows are closed.
+app.on('window-all-closed', function () {
+  // On OS X it is common for applications and their menu bar
+  // to stay active until the user quits explicitly with Cmd + Q
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})
+
+app.on('activate', function () {
+  // On OS X it's common to re-create a window in the app when the
+  // dock icon is clicked and there are no other windows open.
+  if (Object.keys(windows).length == 0) {
+    createWindow()
+  }
+})
+
+// In this file you can include the rest of your app's specific main process
+// code. You can also put them in separate files and require them here.
+
+
 function findDevice(mac) {
     return new Promise((resolve, reject) => {
         var timeout = setTimeout(function() {
@@ -99,6 +159,11 @@ var sessions = [];
 var states = [];
 var devices = [];
 (async function start() {
+    // This method will be called when Electron has finished
+    // initialization and is ready to create browser windows.
+    // Some APIs can only be used after this event occurs.
+    app.on('ready', createWindow)
+
     for(let d of config['devices']) {
         winston.info("Connecting to device", { 'mac': d });
         try {
@@ -143,7 +208,7 @@ var devices = [];
                 } else {
                     let stream = fs.createWriteStream(path.join(CSV_DIR, util.format("%s_%s_%s.csv", now, d.address.replace(/:/g, ""), s)));
                     let newState = {
-                        'stream': stream
+                        'stream': stream,
                     }
                     sensorConfig[s].csvHeader(stream);
                     MetaWear.mbl_mw_datasignal_subscribe(sensorConfig[s].signal(d.board), MetaWear.FnVoid_DataP.toPointer(pointer => {
@@ -152,6 +217,9 @@ var devices = [];
     
                     if (session != null) {
                         newState['session'] = session;
+                    }
+                    newState[`update-graph`] = (data) => {
+                        windows[d.address].webContents.send(`update-${s}-${d.address}` , data);
                     }
                     states.push(newState);
                 }
