@@ -110,7 +110,7 @@ app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') {
         app.quit()
     }
-})
+});
 app.on('browser-window-created',function(e,window) {
     window.setMenu(null);
 });
@@ -241,7 +241,7 @@ app.on('ready', async () => {
                 }
             });
             let sensors = Object.keys(config["sensors"]).filter(s => sensorConfig[s].exists(d.board));
-            createWindow(d.address, sensors, config['resolution'])
+            createWindow(d.address, sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'])
             sensors.forEach(s => {
                 sensorConfig[s].configure(d.board, config["sensors"][s]);
                 sensorConfig[s].start(d.board);

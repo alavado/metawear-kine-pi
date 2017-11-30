@@ -62,27 +62,35 @@
       let url = new URL(window.location);
       let params = new URLSearchParams(url.search.substring(1));
 
-      let sensors = params.get('sensors').split(',');
-      let width = parseInt(params.get("width"));
+      let sensors = params.get('sensors').split(',').map(s => {
+        let parts = s.split('=')
+        return [parts[0], parseFloat(parts[1])]
+      });
+      let width = parseInt(params.get("width")) - 50;
       let height = parseInt(params.get("height")) / sensors.length - 27;
       let root = document.getElementById("root");
+      let minInterval = sensors.map(s => s[1]).reduce((acc, e) => Math.min(acc, e))
+      console.log(minInterval)
+
       sensors.forEach(s => {
-        var elements = setupGraph(s, height)
+        let config = GraphConfig[s[0]];
+
+        var elements = setupGraph(s[0], height);
         var graph = new Rickshaw.Graph({
           element: elements[0],
-          min: GraphConfig[s].min,
-          max: GraphConfig[s].max,
-          width: width - 50,
+          min: config.min,
+          max: config.max,
+          width: width,
           height: height - 13,
           renderer: 'line',
-          series: new Rickshaw.Series.FixedDuration(GraphConfig[s].attr, undefined, {
-            timeInterval: 10,
-            maxDataPoints: width,
+          series: new Rickshaw.Series.FixedDuration(config.attr, undefined, {
+            timeInterval: s[1],
+            maxDataPoints: width * (minInterval / s[1]),
             timeBase: now / 1000
           })
         });
         
-        states[s] = {
+        states[s[0]] = {
           'graph': graph, 
           'y-axis': new Rickshaw.Graph.Axis.Y({
             graph: graph,
@@ -90,17 +98,17 @@
             orientation: 'left',
             element: elements[1]
           })
-        }
-        graph.render()
+        };
+        graph.render();
         
-        ipc.on(`update-${s}-${params.get('mac')}`, function (event, arg) {
-          states[s]['graph'].series.addData(GraphConfig[s].unpack(arg));
+        ipc.on(`update-${s[0]}-${params.get('mac')}`, function (event, arg) {
+          graph.series.addData(config.unpack(arg));
         })
       })
 
       setInterval(() => {
         Object.values(states).forEach(e => e['graph'].render())
-      }, 33)
+      }, refesh)
     </script>
   </body>
 </html>
