@@ -3,51 +3,52 @@
   <head>
     <meta charset="UTF-8">
   </head>
-  <body>
-    <div id="chart"></div>
-
+  <body id="root">
     <script>
+      // You can also require other files to run in this process
+      const GraphConfig = require('../lib/graph-config.js')
       const ipc = require('electron').ipcRenderer
       global.jQuery = require('jquery')
       global.d3 = require('d3');
       var Rickshaw = require('rickshaw');
 
+      let now = new Date().getTime();
+      let states = {}
       let url = new URL(window.location);
       let params = new URLSearchParams(url.search.substring(1));
-      let mac = params.get('mac');
 
-      let now = new Date().getTime();
-      var graph = new Rickshaw.Graph( {
-            element: document.querySelector("#chart"),
-            min: -16.0,
-            max: 16.0,
-            width: 580,
-            height: 250,
-            renderer: 'line',
-            series: new Rickshaw.Series.FixedDuration([
-              { name: 'xaxis', color: 'red' },
-              { name: 'yaxis', color: 'green' },
-              { name: 'zaxis', color: 'blue' }
-              ], undefined, {
-                timeInterval: 42,
-                maxDataPoints: 240,
-                timeBase: now / 1000
-              }
-            )
-      });
-      graph.render();
+      let root = document.getElementById("root");
+      params.get('sensors').split(',').forEach(s => {
+        var id = `chart-${GraphConfig[s].shortName}`;
 
-      let lastUpdate = now;
-      ipc.on(`update-Accelerometer-${mac.toLowerCase()}`, function (event, arg) {
-        let parts = arg.split(",");
-        graph.series.addData({'xaxis': parts[3], 'yaxis': parts[4], 'zaxis': parts[5]});
+        var div = document.createElement("div");
+        div.setAttribute("id", id)
+        root.appendChild(div)
 
-        let now = new Date().getTime()
-        if (now - lastUpdate >= 42) {
-          lastUpdate = now;
-          graph.render();
-        }
+        var graph = new Rickshaw.Graph({
+          element: document.querySelector(`#${id}`),
+          min: GraphConfig[s].min,
+          max: GraphConfig[s].max,
+          width: 580,
+          height: 250,
+          renderer: 'line',
+          series: new Rickshaw.Series.FixedDuration(GraphConfig[s].attr, undefined, {
+            timeInterval: 42,
+            maxDataPoints: 240,
+            timeBase: now / 1000
+          })
+        });
+        states[s] = {'graph': graph}
+        graph.render();
+
+        ipc.on(`update-${s}-${params.get('mac')}`, function (event, arg) {
+          states[s]['graph'].series.addData(GraphConfig[s].unpack(arg));
+        })
       })
+
+      setInterval(() => {
+        Object.values(states).forEach(e => e['graph'].render())
+      }, 42)
     </script>
   </body>
 </html>
