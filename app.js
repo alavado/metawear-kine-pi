@@ -183,7 +183,7 @@ app.on('ready', async () => {
             let device = await findDevice(d);
             await new Promise((resolve, reject) => {
                 var timeout = setTimeout(function() {
-                    reject("Failed to initialize C++ SDK");
+                    reject("Failed to initialize SDK");
                 }, 10000);
 
                 device.connectAndSetUp(error => {
