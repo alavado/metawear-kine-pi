@@ -5,6 +5,7 @@
   </head>
   <body id="root">
     <script>
+      const refesh = 33
       // You can also require other files to run in this process
       const GraphConfig = require('../lib/graph-config.js')
       const ipc = require('electron').ipcRenderer
@@ -17,8 +18,11 @@
       let url = new URL(window.location);
       let params = new URLSearchParams(url.search.substring(1));
 
+      let sensors = params.get('sensors').split(',');
+      let width = parseInt(params.get("width"));
+      let height = parseInt(params.get("height")) / sensors.length;
       let root = document.getElementById("root");
-      params.get('sensors').split(',').forEach(s => {
+      sensors.forEach(s => {
         var id = `chart-${GraphConfig[s].shortName}`;
 
         var div = document.createElement("div");
@@ -29,11 +33,11 @@
           element: document.querySelector(`#${id}`),
           min: GraphConfig[s].min,
           max: GraphConfig[s].max,
-          width: 580,
-          height: 250,
+          width: width,
+          height: height,
           renderer: 'line',
           series: new Rickshaw.Series.FixedDuration(GraphConfig[s].attr, undefined, {
-            timeInterval: 42,
+            timeInterval: refesh,
             maxDataPoints: 240,
             timeBase: now / 1000
           })
@@ -48,7 +52,7 @@
 
       setInterval(() => {
         Object.values(states).forEach(e => e['graph'].render())
-      }, 42)
+      }, refesh)
     </script>
   </body>
 </html>

@@ -46,6 +46,16 @@ parser.addArgument(['-o'], {
     help: 'Path to store the CSV files',
     metavar: 'path'
 });
+parser.addArgument(['--width'], {
+    help: 'Window width',
+    metavar: 'res',
+    type: 'int'
+});
+parser.addArgument(['--height'], {
+    help: 'Window height',
+    metavar: 'res',
+    type: 'int'
+});
 
 var args = parser.parseArgs();
 var config, Session = null;
@@ -63,6 +73,7 @@ if (args['config'] != null) {
         winston.error("either '--config' or '--device' & '--sensor' options must be used");
         process.exit(0);
     }
+
     if (args['cloud_user'] != null && args['cloud_passwd'] != null) {
         config["cloudLogin"] = {
             "username" : args['cloud_user'],
@@ -71,6 +82,11 @@ if (args['config'] != null) {
     } else if (!(args['cloud_user'] == null && args['cloud_passwd'] == null)) {
         winston.error("'--cloud-user' and '--cloud-passwd' required to sync to MetaCloud");
         process.exit(0);
+    }
+
+    config["resolution"] = {
+        "width": args["width"],
+        "height": args["height"]
     }
 }
 
@@ -96,9 +112,9 @@ app.on('window-all-closed', function () {
   }
 })
 
-function createWindow (mac, sensors) {
+function createWindow (mac, sensors, resolution) {
   // Create the browser window.
-  let newWindow = new BrowserWindow({width: 800, height: 600})
+  let newWindow = new BrowserWindow(resolution)
   windows[mac.toLowerCase()] = newWindow;
 
   // and load the index.html of the app.
@@ -106,7 +122,7 @@ function createWindow (mac, sensors) {
     pathname: path.join(__dirname, 'views', 'index.html'),
     protocol: 'file:',
     slashes: true,
-    search: `mac=${mac}&sensors=${sensors.join(',')}`
+    search: `mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
   }))
 
   // Open the DevTools.
@@ -147,6 +163,16 @@ var sessions = [];
 var states = [];
 var devices = [];
 app.on('ready', async () => {
+    if (!('resolution' in config)) {
+        config["resolution"] = { }
+    }
+    if (!('width' in config['resolution']) || config['resolution']['width'] == null) {
+        config['resolution']['width'] = electron.screen.getPrimaryDisplay().size.width / 2
+    }
+    if (!('height' in config['resolution']) || config['resolution']['height'] == null) {
+        config['resolution']['height'] = electron.screen.getPrimaryDisplay().size.height / 2
+    }
+    
     // This method will be called when Electron has finished
     // initialization and is ready to create browser windows.
     // Some APIs can only be used after this event occurs.
@@ -157,7 +183,7 @@ app.on('ready', async () => {
             let device = await findDevice(d);
             await new Promise((resolve, reject) => {
                 var timeout = setTimeout(function() {
-                    reject(null);
+                    reject("Failed to initialize C++ SDK");
                 }, 10000);
 
                 device.connectAndSetUp(error => {
@@ -170,7 +196,7 @@ app.on('ready', async () => {
             MetaWear.mbl_mw_settings_set_connection_parameters(device.board, 7.5, 7.5, 0, 6000);
             devices.push(device);
         } catch (e) {
-            winston.warn("Failed to connect to and setup device", {'mac': d});
+            winston.warn(e, {'mac': d});
         }
     }
 
@@ -212,7 +238,7 @@ app.on('ready', async () => {
                 }
             });
             let sensors = Object.keys(config["sensors"]).filter(s => sensorConfig[s].exists(d.board));
-            createWindow(d.address, sensors)
+            createWindow(d.address, sensors, config['resolution'])
             sensors.forEach(s => {
                 sensorConfig[s].configure(d.board, config["sensors"][s]);
                 sensorConfig[s].start(d.board);
