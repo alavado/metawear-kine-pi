@@ -105,37 +105,40 @@ var windows = {}
 
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {
-  // On OS X it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+    // On OS X it is common for applications and their menu bar
+    // to stay active until the user quits explicitly with Cmd + Q
+    if (process.platform !== 'darwin') {
+        app.quit()
+    }
 })
+app.on('browser-window-created',function(e,window) {
+    window.setMenu(null);
+});
 
 function createWindow (mac, sensors, resolution) {
-  // Create the browser window.
-  let newWindow = new BrowserWindow(resolution)
-  windows[mac.toLowerCase()] = newWindow;
+    // Create the browser window.
+    let newWindow = new BrowserWindow(resolution)
+    windows[mac.toLowerCase()] = newWindow;
 
-  // and load the index.html of the app.
-  newWindow.loadURL(url.format({
-    pathname: path.join(__dirname, 'views', 'index.html'),
-    protocol: 'file:',
-    slashes: true,
-    search: `mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
-  }))
+    // and load the index.html of the app.
+    newWindow.loadURL(url.format({
+        pathname: path.join(__dirname, 'views', 'index.html'),
+        protocol: 'file:',
+        slashes: true,
+        search: `mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
+    }))
 
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
+    // Open the DevTools.
+    // mainWindow.webContents.openDevTools()
 
-  // Emitted when the window is closed.
-  newWindow.on('closed', function () {
-    delete windows[mac.toLowerCase()]
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
-    newWindow = null
-  })
+    // Emitted when the window is closed.
+    newWindow.on('closed', function () {
+        delete windows[mac.toLowerCase()]
+        // Dereference the window object, usually you would store windows
+        // in an array if your app supports multi windows, this is the time
+        // when you should delete the corresponding element.
+        newWindow = null
+    })
 }
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
