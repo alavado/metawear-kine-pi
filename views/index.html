@@ -111,11 +111,6 @@
           })
         });
         
-        var legend = new Rickshaw.Graph.Legend({
-          element: elements[2],
-          graph: graph,
-          naturalOrder: true
-        });
         states[s[0]] = {
           'graph': graph, 
           'y-axis': new Rickshaw.Graph.Axis.Y({
@@ -124,10 +119,10 @@
             orientation: 'left',
             element: elements[1]
           }),
-          'legend': legend,
-          'shelving': new Rickshaw.Graph.Behavior.Series.Toggle({
+          'legend': new Rickshaw.Graph.Legend({
+            element: elements[2],
             graph: graph,
-            legend: legend
+            naturalOrder: true
           })
         };
         graph.render();
