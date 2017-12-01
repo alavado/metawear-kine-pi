@@ -258,28 +258,34 @@ app.on('ready', async () => {
         })
         
         process.openStdin().addListener("data", async data => {
-            devices.forEach(d => MetaWear.mbl_mw_debug_reset(d[0].board));
+            winston.info("Resetting devices");
+            Promise.all(devices.map(d => {
+                var task = new Promise((resolve, reject) => d[0].on('disconnect', () => resolve(null)))
+                MetaWear.mbl_mw_debug_reset(d[0].board)
+                return task
+            })).then(async results => {
+                states.forEach(s => s['stream'].end());
 
-            if ('cloudLogin' in config) {
-                winston.info("Syncing data to MetaCloud");
-                for(let s of sessions) {
-                    try {
-                        await new Promise((resolve, reject) => {
-                            s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
-                                if (error == null) resolve(result)
-                                else reject(error);
+                if ('cloudLogin' in config) {
+                    winston.info("Syncing data to MetaCloud");
+                    for(let s of sessions) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
+                                    if (error == null) resolve(result)
+                                    else reject(error);
+                                });
                             });
-                        });
-                    } catch (e) {
-                        winston.warn("Could not sync data to metacloud", { 'error': error });
+                        } catch (e) {
+                            winston.warn("Could not sync data to metacloud", { 'error': error });
+                        }
                     }
+                    winston.info("Syncing completed");
                 }
-                winston.info("Syncing completed");
-            }
-            
-            states.forEach(s => s['stream'].end());
-            process.exit(0)
+                process.exit(0)
+            })
         });
-        winston.info("Streaming data to host device. Press [Enter] to terminate...");
+        winston.info("Streaming data to host device");
+        winston.info("Press [Enter] to terminate...");
     }, 1000);
 })
