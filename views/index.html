@@ -20,6 +20,21 @@
       .rickshaw_graph .y_ticks {
         left: 0;
       }
+      .rickshaw_legend {
+        color: #353535;
+        background: #fff;
+        padding: 0px 5px 12px;
+        transform: translate(+50%);
+      }
+      .rickshaw_legend .line {
+        clear: none;
+        padding-right: 15px;
+        float: left;
+      }
+
+      #root {
+        overflow: hidden;
+      }
     </style>
   </head>
   <body id="root">
@@ -29,23 +44,30 @@
         title.textContent = name;
         root.append(title)
 
+        var realHeight = height - title.clientHeight - 30;
+
         var container = document.createElement("div");
         container.setAttribute("id", `container-${name}`);
-        container.setAttribute("style", `display: flex;font-family: Arial, Helvetica, sans-serif;height: ${height}px`);
+        container.setAttribute("style", `display: flex;font-family: Arial, Helvetica, sans-serif`);
 
         var yaxis = document.createElement("div");
         yaxis.setAttribute("id", `yaxis-${name}`);
-        yaxis.setAttribute("style", `width: 40px; height: ${height}px`);
+        yaxis.setAttribute("style", `width: 40px; height: ${realHeight}px`);
         container.append(yaxis);
 
         var div = document.createElement("div");
         div.setAttribute("id", `chart-${name}`);
-        div.setAttribute("style", `flex-grow: 1; height: ${height}px`);
+        div.setAttribute("style", `flex-grow: 1; height: ${realHeight}px`);
         container.appendChild(div);
 
         root.appendChild(container);
 
-        return [div, yaxis];
+        var legend = document.createElement("div")
+        legend.setAttribute("id", `legend-${name}`);
+        legend.setAttribute("class", 'legend');
+        root.appendChild(legend);
+
+        return [div, yaxis, legend];
       }
     </script>
     <script>
@@ -67,10 +89,9 @@
         return [parts[0], parseFloat(parts[1])]
       });
       let width = parseInt(params.get("width")) - 50;
-      let height = parseInt(params.get("height")) / sensors.length - 27;
+      let height = (parseInt(params.get("height")) - 20) / sensors.length;
       let root = document.getElementById("root");
       let minInterval = sensors.map(s => s[1]).reduce((acc, e) => Math.min(acc, e))
-      console.log(minInterval)
 
       sensors.forEach(s => {
         let config = GraphConfig[s[0]];
@@ -81,7 +102,7 @@
           min: config.min,
           max: config.max,
           width: width,
-          height: height - 13,
+          height: elements[0].clientHeight,
           renderer: 'line',
           series: new Rickshaw.Series.FixedDuration(config.attr, undefined, {
             timeInterval: s[1],
@@ -90,6 +111,11 @@
           })
         });
         
+        var legend = new Rickshaw.Graph.Legend({
+          element: elements[2],
+          graph: graph,
+          naturalOrder: true
+        });
         states[s[0]] = {
           'graph': graph, 
           'y-axis': new Rickshaw.Graph.Axis.Y({
@@ -97,6 +123,11 @@
             ticksTreatment: 'fancy',
             orientation: 'left',
             element: elements[1]
+          }),
+          'legend': legend,
+          'shelving': new Rickshaw.Graph.Behavior.Series.Toggle({
+            graph: graph,
+            legend: legend
           })
         };
         graph.render();

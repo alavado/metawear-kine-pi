@@ -116,8 +116,9 @@ app.on('browser-window-created',function(e,window) {
 });
 
 function createWindow (mac, sensors, resolution) {
+    let attr = Object.assign({}, resolution);
     // Create the browser window.
-    let newWindow = new BrowserWindow(resolution)
+    let newWindow = new BrowserWindow(attr)
     windows[mac.toLowerCase()] = newWindow;
 
     // and load the index.html of the app.
