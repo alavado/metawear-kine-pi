@@ -62,13 +62,20 @@ var config, Session = null;
 
 if (args['config'] != null) {
     config = JSON.parse(fs.readFileSync(args['config'], 'utf8'));
+    config['devices'] = config['devices'].map(d => typeof(d) === 'string' ? ({'mac': d }) : d)
 } else {
     if (args['device'] != null && args['sensor'] != null) {
-        config = { "devices": args['device'], "sensors": {} };
-        args['sensor'].forEach(s => {
-            const parts = s.split("=");
-            config["sensors"][parts[0]] = parseFloat(parts[1]);
-        });
+        config = {
+            "devices": args['device'].map(d => {
+                const parts = d.split("=");
+                return parts.length == 1 ? {'mac': d} : {'mac': parts[0], 'name': parts[1]}
+            }),
+            "sensors": args['sensor'].reduce((acc, s) => {
+                const parts = s.split("=");
+                acc[parts[0]] = parseFloat(parts[1])
+                return acc
+            }, {})
+        };
     } else {
         winston.error("either '--config' or '--device' & '--sensor' options must be used");
         process.exit(0);
@@ -115,11 +122,11 @@ app.on('browser-window-created',function(e,window) {
     window.setMenu(null);
 });
 
-function createWindow (mac, sensors, resolution) {
-    let attr = Object.assign({}, resolution);
+function createWindow (mac, title, sensors, resolution) {
+    let attr = Object.assign({title: `${title} (${mac})`}, resolution);
     // Create the browser window.
     let newWindow = new BrowserWindow(attr)
-    windows[mac.toLowerCase()] = newWindow;
+    windows[mac] = newWindow;
 
     // and load the index.html of the app.
     newWindow.loadURL(url.format({
@@ -134,7 +141,7 @@ function createWindow (mac, sensors, resolution) {
 
     // Emitted when the window is closed.
     newWindow.on('closed', function () {
-        delete windows[mac.toLowerCase()]
+        delete windows[mac]
         // Dereference the window object, usually you would store windows
         // in an array if your app supports multi windows, this is the time
         // when you should delete the corresponding element.
@@ -182,9 +189,9 @@ app.on('ready', async () => {
     // Some APIs can only be used after this event occurs.
     
     for(let d of config['devices']) {
-        winston.info("Connecting to device", { 'mac': d });
+        winston.info("Connecting to device", { 'mac': d['mac'] });
         try {
-            let device = await findDevice(d);
+            let device = await findDevice(d['mac']);
             await new Promise((resolve, reject) => {
                 var timeout = setTimeout(function() {
                     reject("Failed to initialize SDK");
@@ -198,9 +205,9 @@ app.on('ready', async () => {
             });
             
             MetaWear.mbl_mw_settings_set_connection_parameters(device.board, 7.5, 7.5, 0, 6000);
-            devices.push(device);
+            devices.push([device, 'name' in d ? d['name'] : 'MetaWear']);
         } catch (e) {
-            winston.warn(e, {'mac': d});
+            winston.warn(e, {'mac': d['mac']});
         }
     }
 
@@ -210,10 +217,11 @@ app.on('ready', async () => {
     }
     setTimeout(() => {
         var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
-        devices.forEach(d => {
+        devices.forEach(it => {
+            let d = it[0]
             var session = null;
             if (Session != null) {
-                session = Session.create(d.firmwareRevision, d.address, d.modelDescription, 'Device #1', 'MetaBase', '1.0.0');
+                session = Session.create(d.firmwareRevision, d.address, d.modelDescription, it[1], 'MetaBase', '1.0.0');
                 sessions.push(session);
             }
 
@@ -242,7 +250,7 @@ app.on('ready', async () => {
                 }
             });
             let sensors = Object.keys(config["sensors"]).filter(s => sensorConfig[s].exists(d.board));
-            createWindow(d.address, sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'])
+            createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'])
             sensors.forEach(s => {
                 sensorConfig[s].configure(d.board, config["sensors"][s]);
                 sensorConfig[s].start(d.board);
@@ -250,7 +258,7 @@ app.on('ready', async () => {
         })
         
         process.openStdin().addListener("data", async data => {
-            devices.forEach(d => MetaWear.mbl_mw_debug_reset(d.board));
+            devices.forEach(d => MetaWear.mbl_mw_debug_reset(d[0].board));
 
             if ('cloudLogin' in config) {
                 winston.info("Syncing data to MetaCloud");
