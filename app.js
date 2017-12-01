@@ -122,8 +122,8 @@ app.on('browser-window-created',function(e,window) {
     window.setMenu(null);
 });
 
-function createWindow (mac, title, sensors, resolution) {
-    let attr = Object.assign({title: `${title} (${mac})`}, resolution);
+function createWindow(mac, title, sensors, resolution, x, y) {
+    let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);
     // Create the browser window.
     let newWindow = new BrowserWindow(attr)
     windows[mac] = newWindow;
@@ -217,6 +217,7 @@ app.on('ready', async () => {
     }
     setTimeout(() => {
         var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
+        var x = 0, y = 0;
         devices.forEach(it => {
             let d = it[0]
             var session = null;
@@ -243,14 +244,22 @@ app.on('ready', async () => {
                     if (session != null) {
                         newState['session'] = session;
                     }
-                    newState['update-graph'] = (data) => {
-                        windows[d.address].webContents.send(`update-${s}-${d.address}` , data);
-                    }
+                    newState['update-graph'] = (data) => windows[d.address].webContents.send(`update-${s}-${d.address}` , data)
                     states.push(newState);
                 }
             });
             let sensors = Object.keys(config["sensors"]).filter(s => sensorConfig[s].exists(d.board));
-            createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'])
+            createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'], x, y)
+            x += config['resolution']['width'];
+            if (x >= electron.screen.getPrimaryDisplay().size.width) {
+                x = 0;
+                y += config['resolution']['height'];
+
+                if (y >= electron.screen.getPrimaryDisplay().size.height) {
+                    x = 0;
+                    y = 0;
+                }
+            }
             sensors.forEach(s => {
                 sensorConfig[s].configure(d.board, config["sensors"][s]);
                 sensorConfig[s].start(d.board);
