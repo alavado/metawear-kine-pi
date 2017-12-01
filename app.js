@@ -7,13 +7,6 @@ var moment = require("moment");
 var winston = require('winston');
 var ArgumentParser = require('argparse').ArgumentParser;
 
-const electron = require('electron')
-// Module to control application life.
-const app = electron.app
-// Module to create native browser window.
-const BrowserWindow = electron.BrowserWindow
-const url = require('url')
-
 var parser = new ArgumentParser({
     version: '1.0.0',
     addHelp:true,
@@ -55,6 +48,10 @@ parser.addArgument(['--height'], {
     help: 'Window height',
     metavar: 'res',
     type: 'int'
+});
+parser.addArgument(['--no-graph'], {
+    help: 'Disables the real time graph',
+    nargs: 0
 });
 
 var args = parser.parseArgs();
@@ -106,50 +103,6 @@ if (!fs.existsSync(CSV_DIR)){
     fs.mkdirSync(CSV_DIR);
 }
 
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-var windows = {}
-
-// Quit when all windows are closed.
-app.on('window-all-closed', function () {
-    // On OS X it is common for applications and their menu bar
-    // to stay active until the user quits explicitly with Cmd + Q
-    if (process.platform !== 'darwin') {
-        app.quit()
-    }
-});
-app.on('browser-window-created',function(e,window) {
-    window.setMenu(null);
-});
-
-function createWindow(mac, title, sensors, resolution, x, y) {
-    let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);
-    // Create the browser window.
-    let newWindow = new BrowserWindow(attr)
-    windows[mac] = newWindow;
-
-    // and load the index.html of the app.
-    newWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'views', 'index.html'),
-        protocol: 'file:',
-        slashes: true,
-        search: `mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
-    }))
-
-    // Open the DevTools.
-    // mainWindow.webContents.openDevTools()
-
-    // Emitted when the window is closed.
-    newWindow.on('closed', function () {
-        delete windows[mac]
-        // Dereference the window object, usually you would store windows
-        // in an array if your app supports multi windows, this is the time
-        // when you should delete the corresponding element.
-        newWindow = null
-    })
-}
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
 
 function findDevice(mac) {
     return new Promise((resolve, reject) => {
@@ -173,21 +126,7 @@ function findDevice(mac) {
 var sessions = [];
 var states = [];
 var devices = [];
-app.on('ready', async () => {
-    if (!('resolution' in config)) {
-        config["resolution"] = { }
-    }
-    if (!('width' in config['resolution']) || config['resolution']['width'] == null) {
-        config['resolution']['width'] = electron.screen.getPrimaryDisplay().size.width / 2
-    }
-    if (!('height' in config['resolution']) || config['resolution']['height'] == null) {
-        config['resolution']['height'] = electron.screen.getPrimaryDisplay().size.height / 2
-    }
-    
-    // This method will be called when Electron has finished
-    // initialization and is ready to create browser windows.
-    // Some APIs can only be used after this event occurs.
-    
+async function start(options) {
     for(let d of config['devices']) {
         winston.info("Connecting to device", { 'mac': d['mac'] });
         try {
@@ -226,6 +165,7 @@ app.on('ready', async () => {
                 sessions.push(session);
             }
 
+            let sensors = [];
             Object.keys(config['sensors']).forEach(s => {
                 if (!(s in sensorConfig)) {
                     winston.warn(util.format("'%s' is not a valid sensor name", s));
@@ -244,20 +184,41 @@ app.on('ready', async () => {
                     if (session != null) {
                         newState['session'] = session;
                     }
-                    newState['update-graph'] = (data) => windows[d.address].webContents.send(`update-${s}-${d.address}` , data)
+                    
+                    newState['update-graph'] = args['no_graph'] == null ? 
+                        (data) => windows[d.address].webContents.send(`update-${s}-${d.address}` , data) :
+                        (data) => {}
+                    
                     states.push(newState);
+                    sensors.push(s);
                 }
             });
-            let sensors = Object.keys(config["sensors"]).filter(s => sensorConfig[s].exists(d.board));
-            createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'], x, y)
-            x += config['resolution']['width'];
-            if (x >= electron.screen.getPrimaryDisplay().size.width) {
-                x = 0;
-                y += config['resolution']['height'];
 
-                if (y >= electron.screen.getPrimaryDisplay().size.height) {
+            if (args['no_graph'] == null) {
+                let sizes = {
+                    'width': options['electron'].screen.getPrimaryDisplay().size.width,
+                    'height': options['electron'].screen.getPrimaryDisplay().size.height
+                };
+                if (!('resolution' in config)) {
+                    config["resolution"] = { }
+                }
+                if (!('width' in config['resolution']) || config['resolution']['width'] == null) {
+                    config['resolution']['width'] = sizes['width'] / 2
+                }
+                if (!('height' in config['resolution']) || config['resolution']['height'] == null) {
+                    config['resolution']['height'] = sizes['height'] / 2
+                }
+    
+                createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'], x, y)
+                x += config['resolution']['width'];
+                if (x >= sizes['width']) {
                     x = 0;
-                    y = 0;
+                    y += config['resolution']['height'];
+
+                    if (y >= sizes['height']) {
+                        x = 0;
+                        y = 0;
+                    }
                 }
             }
             sensors.forEach(s => {
@@ -297,4 +258,63 @@ app.on('ready', async () => {
         winston.info("Streaming data to host device");
         winston.info("Press [Enter] to terminate...");
     }, 1000);
-})
+}
+
+// Keep a global reference of the window object, if you don't, the window will
+// be closed automatically when the JavaScript object is garbage collected.
+var windows = {};
+
+if (args['no_graph'] == null) {
+    const electron = require('electron')
+    // Module to control application life.
+    const app = electron.app
+    // Module to create native browser window.
+    const BrowserWindow = electron.BrowserWindow
+    const url = require('url')
+
+    let options = {
+        'electron': electron
+    }
+    // Quit when all windows are closed.
+    app.on('window-all-closed', function () {
+        // On OS X it is common for applications and their menu bar
+        // to stay active until the user quits explicitly with Cmd + Q
+        if (process.platform !== 'darwin') {
+            app.quit()
+        }
+    });
+    app.on('browser-window-created',function(e,window) {
+        window.setMenu(null);
+    });
+
+    function createWindow(mac, title, sensors, resolution, x, y) {
+        let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);
+        // Create the browser window.
+        let newWindow = new BrowserWindow(attr)
+        windows[mac] = newWindow;
+    
+        // and load the index.html of the app.
+        newWindow.loadURL(url.format({
+            pathname: path.join(__dirname, 'views', 'index.html'),
+            protocol: 'file:',
+            slashes: true,
+            search: `mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
+        }))
+    
+        // Open the DevTools.
+        // mainWindow.webContents.openDevTools()
+    
+        // Emitted when the window is closed.
+        newWindow.on('closed', function () {
+            delete windows[mac]
+            // Dereference the window object, usually you would store windows
+            // in an array if your app supports multi windows, this is the time
+            // when you should delete the corresponding element.
+            newWindow = null
+        })
+    }
+
+    app.on('ready', () => start(options));
+} else {
+    start({});
+}
