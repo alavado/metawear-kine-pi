@@ -25,6 +25,9 @@
         background: #fff;
         padding: 0px 5px 12px;
         transform: translate(+50%);
+        position: relative;
+        top: -30px;
+        margin-bottom: -30px;
       }
       .rickshaw_legend .line {
         clear: none;
@@ -44,7 +47,7 @@
         title.textContent = name;
         root.append(title)
 
-        var realHeight = height - title.clientHeight - 30;
+        var realHeight = height - title.clientHeight - 10;
 
         var container = document.createElement("div");
         container.setAttribute("id", `container-${name}`);
@@ -64,7 +67,6 @@
 
         var legend = document.createElement("div")
         legend.setAttribute("id", `legend-${name}`);
-        legend.setAttribute("class", 'legend');
         root.appendChild(legend);
 
         return [div, yaxis, legend];
