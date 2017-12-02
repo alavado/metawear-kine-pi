@@ -93,7 +93,7 @@
       let width = parseInt(params.get("width")) - 50;
       let height = (parseInt(params.get("height")) - 20) / sensors.length;
       let root = document.getElementById("root");
-      let minInterval = sensors.map(s => s[1]).reduce((acc, e) => Math.min(acc, e))
+      const reference = 10
 
       sensors.forEach(s => {
         let config = GraphConfig[s[0]];
@@ -108,7 +108,7 @@
           renderer: 'line',
           series: new Rickshaw.Series.FixedDuration(config.attr, undefined, {
             timeInterval: s[1],
-            maxDataPoints: width * (minInterval / s[1]),
+            maxDataPoints: width * (reference / s[1]),
             timeBase: now / 1000
           })
         });

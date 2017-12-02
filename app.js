@@ -164,10 +164,12 @@ async function start(options) {
         winston.error("Failed to connect to any devices, terminating app");
         process.exit(0);
     }
-    setTimeout(() => {
+    setTimeout(async () => {
+        winston.info("Configuring devices")
+
         var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
         var x = 0, y = 0;
-        devices.forEach(it => {
+        for(let it of devices) {
             let d = it[0]
             var session = null;
             if (Session != null) {
@@ -204,69 +206,78 @@ async function start(options) {
                 }
             });
 
-            if (args['no_graph'] == null) {
-                let sizes = {
-                    'width': options['electron'].screen.getPrimaryDisplay().size.width,
-                    'height': options['electron'].screen.getPrimaryDisplay().size.height
-                };
-                if (!('resolution' in config)) {
-                    config["resolution"] = { }
-                }
-                if (!('width' in config['resolution']) || config['resolution']['width'] == null) {
-                    config['resolution']['width'] = sizes['width'] / 2
-                }
-                if (!('height' in config['resolution']) || config['resolution']['height'] == null) {
-                    config['resolution']['height'] = sizes['height'] / 2
-                }
-    
-                createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'], x, y)
-                x += config['resolution']['width'];
-                if (x >= sizes['width']) {
-                    x = 0;
-                    y += config['resolution']['height'];
-
-                    if (y >= sizes['height']) {
-                        x = 0;
-                        y = 0;
+            if (sensors.length != 0) {
+                if (args['no_graph'] == null) {
+                    let sizes = {
+                        'width': options['electron'].screen.getPrimaryDisplay().size.width,
+                        'height': options['electron'].screen.getPrimaryDisplay().size.height
+                    };
+                    if (!('resolution' in config)) {
+                        config["resolution"] = { }
                     }
-                }
-            }
-            sensors.forEach(s => {
-                sensorConfig[s].configure(d.board, config["sensors"][s]);
-                sensorConfig[s].start(d.board);
-            });
-        })
+                    if (!('width' in config['resolution']) || config['resolution']['width'] == null) {
+                        config['resolution']['width'] = sizes['width'] / 2
+                    }
+                    if (!('height' in config['resolution']) || config['resolution']['height'] == null) {
+                        config['resolution']['height'] = sizes['height'] / 2
+                    }
         
-        process.openStdin().addListener("data", async data => {
-            winston.info("Resetting devices");
-            Promise.all(devices.map(d => {
-                var task = new Promise((resolve, reject) => d[0].on('disconnect', () => resolve(null)))
-                MetaWear.mbl_mw_debug_reset(d[0].board)
-                return task
-            })).then(async results => {
-                states.forEach(s => s['stream'].end());
+                    createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'], x, y)
+                    x += config['resolution']['width'];
+                    if (x >= sizes['width']) {
+                        x = 0;
+                        y += config['resolution']['height'];
 
-                if ('cloudLogin' in config) {
-                    winston.info("Syncing data to MetaCloud");
-                    for(let s of sessions) {
-                        try {
-                            await new Promise((resolve, reject) => {
-                                s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
-                                    if (error == null) resolve(result)
-                                    else reject(error);
-                                });
-                            });
-                        } catch (e) {
-                            winston.warn("Could not sync data to metacloud", { 'error': error });
+                        if (y >= sizes['height']) {
+                            x = 0;
+                            y = 0;
                         }
                     }
-                    winston.info("Syncing completed");
                 }
-                process.exit(0)
-            })
-        });
-        winston.info("Streaming data to host device");
-        winston.info("Press [Enter] to terminate...");
+                for(let s of sensors) {
+                    await sensorConfig[s].configure(d.board, config["sensors"][s]);
+                    sensorConfig[s].start(d.board);
+                }
+            } else {
+                winston.warn("No sensors were enabled for device", { 'mac': d.address })
+            }
+        }
+        
+        if (states.length == 0) {
+            winston.error("No active sensors to receive data from, terminating app")
+            process.exit(0)
+        } else {
+            process.openStdin().addListener("data", async data => {
+                winston.info("Resetting devices");
+                Promise.all(devices.map(d => {
+                    var task = new Promise((resolve, reject) => d[0].on('disconnect', () => resolve(null)))
+                    MetaWear.mbl_mw_debug_reset(d[0].board)
+                    return task
+                })).then(async results => {
+                    states.forEach(s => s['stream'].end());
+    
+                    if ('cloudLogin' in config) {
+                        winston.info("Syncing data to MetaCloud");
+                        for(let s of sessions) {
+                            try {
+                                await new Promise((resolve, reject) => {
+                                    s.sync(config['cloudLogin']['username'], config['cloudLogin']['password'], (error, result) => {
+                                        if (error == null) resolve(result)
+                                        else reject(error);
+                                    });
+                                });
+                            } catch (e) {
+                                winston.warn("Could not sync data to metacloud", { 'error': error });
+                            }
+                        }
+                        winston.info("Syncing completed");
+                    }
+                    process.exit(0)
+                })
+            });
+            winston.info("Streaming data to host device");
+            winston.info("Press [Enter] to terminate...");
+        }
     }, 1000);
 }
 
