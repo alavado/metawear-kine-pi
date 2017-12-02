@@ -39,6 +39,12 @@ still be set), and the app will use the closest valid frequency to the set value
 }
 ```
 
+Use the ``--list-sensors`` option to print a list of available sensors.
+
+```bash
+npm start -- --list-sensors
+```
+
 ## Resolution
 The ``resolution`` key is optional and sets the windows' width and height for the real time graphs.  If not set, the application will automatically create windows 1/4th the 
 screen resolution.

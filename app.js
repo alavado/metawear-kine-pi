@@ -12,11 +12,15 @@ var parser = new ArgumentParser({
     addHelp:true,
     description: 'NodeJS app to stream sensor data to MetaHub'
 });
-parser.addArgument([ '-d', '--device' ], {
+parser.addArgument([ '--device' ], {
     help: 'MAC address of the device to use',
     action: 'append',
     metavar: 'mac',
     type: "string"
+});
+parser.addArgument([ '--list-sensors' ], {
+    help: 'Show available sensors and frequencies',
+    nargs: 0
 });
 parser.addArgument([ '--sensor' ], {
     help: 'Key-value pair that sets a sensors sampling frequency',
@@ -57,6 +61,12 @@ parser.addArgument(['--no-graph'], {
 var args = parser.parseArgs();
 var config, Session = null;
 
+if (args['list_sensors'] != null) {
+    console.log("Available Sensors")
+    console.log("-----------------")
+    Object.keys(sensorConfig).forEach(s => console.log(s))
+    process.exit(0)
+}
 if (args['config'] != null) {
     config = JSON.parse(fs.readFileSync(args['config'], 'utf8'));
     config['devices'] = config['devices'].map(d => typeof(d) === 'string' ? ({'mac': d }) : d)
