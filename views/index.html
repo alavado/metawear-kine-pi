@@ -2,7 +2,6 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <link rel="stylesheet" href="../node_modules/rickshaw/rickshaw.min.css">
     <style>
       h1, h2 {
         font-weight: normal;
@@ -17,24 +16,6 @@
         font-size: 1em;
         text-indent: 40px;
       }
-      .rickshaw_graph .y_ticks {
-        left: 0;
-      }
-      .rickshaw_legend {
-        color: #353535;
-        background: #fff;
-        padding: 0px 5px 12px;
-        transform: translate(+50%);
-        position: relative;
-        top: -30px;
-        margin-bottom: -30px;
-      }
-      .rickshaw_legend .line {
-        clear: none;
-        padding-right: 15px;
-        float: left;
-      }
-
       #root {
         overflow: hidden;
       }
@@ -42,44 +23,49 @@
   </head>
   <body id="root">
     <script>
-      function setupGraph(name, height) {
+      var cartesianLabels = ['samples', 'x-axis', 'y-axis', 'z-axis']
+
+      function GraphSetting(min, max, shortName, labels) {
+        this.range = [min, max];
+        this.shortName = shortName;
+        this.labels = labels;
+      }
+
+      const GraphConfig = {
+        "Accelerometer": new GraphSetting(-21, 21, "acc", cartesianLabels),
+        "Gyroscope" : new GraphSetting(-2100.0, 2100.0, "gyro", cartesianLabels),
+        "Magnetometer" : new GraphSetting(-0.0025, 0.0025, "mag", cartesianLabels),
+        "Quaternion" : new GraphSetting(-1.05, 1.05, "quat", [ 'samples', 'w', 'x', 'y', 'z']),
+        "Euler Angles" : new GraphSetting(-365.0, 365.0, "euler", [ 'samples', 'pitch', 'roll', 'yaw' ]),
+        "Linear Acceleration" : new GraphSetting(-21.0, 21.0, "lin-acc", cartesianLabels),
+        "Gravity" : new GraphSetting(-21.0, 21.0, "gravity", cartesianLabels),
+        "Ambient Light" : new GraphSetting(-10, 64000, "als", [ 'samples', 'illuminance' ]),
+        "Pressure" : new GraphSetting(0, 110000, "pressure", [ 'samples', 'pressure' ]),
+        "Temperature" : new GraphSetting(-45, 130, "temp", [ 'samples', 'temperature' ]),
+        "Humidity" : new GraphSetting(-5, 105, "humidity", [ 'samples', 'relative humidity' ])
+      }
+    </script>
+    <script>
+      function setupGraph(name, width, height) {
         var title = document.createElement("h2");
         title.textContent = name;
         root.append(title)
 
         var realHeight = height - title.clientHeight - 10;
 
-        var container = document.createElement("div");
-        container.setAttribute("id", `container-${name}`);
-        container.setAttribute("style", `display: flex;font-family: Arial, Helvetica, sans-serif`);
-
-        var yaxis = document.createElement("div");
-        yaxis.setAttribute("id", `yaxis-${name}`);
-        yaxis.setAttribute("style", `width: 40px; height: ${realHeight}px`);
-        container.append(yaxis);
-
         var div = document.createElement("div");
         div.setAttribute("id", `chart-${name}`);
-        div.setAttribute("style", `flex-grow: 1; height: ${realHeight}px`);
-        container.appendChild(div);
+        div.setAttribute("style", `width: ${width}px; height: ${realHeight}px`);
 
-        root.appendChild(container);
+        root.appendChild(div);
 
-        var legend = document.createElement("div")
-        legend.setAttribute("id", `legend-${name}`);
-        root.appendChild(legend);
-
-        return [div, yaxis, legend];
+        return [div];
       }
     </script>
     <script>
       const refesh = 33
-      // You can also require other files to run in this process
-      const GraphConfig = require('../lib/graph-config.js')
       const ipc = require('electron').ipcRenderer
-      global.jQuery = require('jquery')
-      global.d3 = require('d3');
-      var Rickshaw = require('rickshaw');
+      const Dygraph = require('dygraphs');
 
       let now = new Date().getTime();
       let states = {}
@@ -90,7 +76,7 @@
         let parts = s.split('=')
         return [parts[0], parseFloat(parts[1])]
       });
-      let width = parseInt(params.get("width")) - 50;
+      let width = parseInt(params.get("width"));
       let height = (parseInt(params.get("height")) - 20) / sensors.length;
       let root = document.getElementById("root");
       const reference = 10
@@ -98,45 +84,36 @@
       sensors.forEach(s => {
         let config = GraphConfig[s[0]];
 
-        var elements = setupGraph(s[0], height);
-        var graph = new Rickshaw.Graph({
-          element: elements[0],
-          min: config.min,
-          max: config.max,
-          width: width,
-          height: elements[0].clientHeight,
-          renderer: 'line',
-          series: new Rickshaw.Series.FixedDuration(config.attr, undefined, {
-            timeInterval: s[1],
-            maxDataPoints: width * (reference / s[1]),
-            timeBase: now / 1000
-          })
-        });
-        
+        var data = []
+        var elements = setupGraph(s[0], width, height);
+        var graph = new Dygraph(elements[0], data,
+          {
+            valueRange: config.range,
+            labels: config.labels,
+            axes: { 
+              x: { 
+                drawAxis : false,
+                drawGrid: false
+              }
+            }
+          });
+
         states[s[0]] = {
           'graph': graph, 
-          'y-axis': new Rickshaw.Graph.Axis.Y({
-            graph: graph,
-            ticksTreatment: 'fancy',
-            orientation: 'left',
-            element: elements[1]
-          }),
-          'legend': new Rickshaw.Graph.Legend({
-            element: elements[2],
-            graph: graph,
-            naturalOrder: true
-          })
+          'data': data,
+          'maxDataPoints': width * (reference / s[1])
         };
-        graph.render();
         
-        ipc.on(`update-${s[0]}-${params.get('mac')}`, function (event, arg) {
-          graph.series.addData(config.unpack(arg));
+        ipc.on(`update-${s[0]}-${params.get('mac')}`, (event, arg) => {
+          arg.unshift(data.length)
+          data.push(arg)
         })
       })
 
-      setInterval(() => {
-        Object.values(states).forEach(e => e['graph'].render())
-      }, refesh)
+      setInterval(() => Object.values(states).forEach(s => s['graph'].updateOptions({
+        'file': s['data'], 
+        'dateWindow': [Math.max(0, s['data'].length - s['maxDataPoints']), Math.max(s['maxDataPoints'], s['data'].length)] 
+      }), refesh));
     </script>
   </body>
 </html>

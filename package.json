@@ -20,12 +20,10 @@
   "homepage": "https://bitbucket.org/mbientlab/metabase-hub#readme",
   "dependencies": {
     "argparse": "^1.0.9",
-    "d3": "^3.5.17",
-    "jquery": "^3.2.1",
+    "dygraphs": "^2.0.0",
     "metacloud": "^0.1.1",
     "metawear": "^0.1.1",
     "moment": "^2.19.2",
-    "rickshaw": "^1.6.3",
     "winston": "^2.4.0"
   },
   "devDependencies": {
