@@ -27,7 +27,7 @@ the UI window and MetaCloud
 
 ## Sensors
 The ``sensors`` key is an object that defines the sampling frequencies for the various data streams.  Some streams, such as sensor fusion data, are not configurable (but must 
-still be set), and the app will use the closest valid frequency to the set value.
+still have a sampling frequency set), and the app will use the closest valid frequency to the set value.
 
 ```json
 {
@@ -45,6 +45,32 @@ Use the ``--list-sensors`` option to print a list of available sensors.
 npm start -- --list-sensors
 ```
 
+## Units
+Sampling frequency values are expressed in ``Hz`` except for temperature and humidity which express them in ``seconds``.  For example, the previous JSON snippet will set the 
+sensors to sample at 100.0Hz, 100.0Hz, and 25.0Hz respectively.  However, the below JSON snippet will sample temperature and humidity at 30min and 1hr respectively (1800s / 3600s):  
+
+```json
+{
+    "sensors": {
+        "Temperature": 1800.0,
+        "Humidity": 3600.0
+    }
+}
+```
+
+## MetaCloud Syncing 
+As mentioned in the opening paragraph, this app can also sync to the *MetaCloud* service.  To enable cloud sync, add the ``cloudLogin`` key along with your MetaCloud login 
+credentials.  The credentials are expressed as a JSON object with ``username`` and ``password`` keys.  
+
+```json
+{
+    "cloudLogin": {
+        "username": "foo",
+        "password": "bar"
+    }
+}
+```
+
 ## Resolution
 The ``resolution`` key is optional and sets the windows' width and height for the real time graphs.  If not set, the application will automatically create windows 1/4th the 
 screen resolution.
@@ -59,21 +85,24 @@ screen resolution.
 ```
 
 # Command Line Options
-All settings in the config file have equivalent command line options.  Like in the config file, the ``--devices`` and ``--sensors`` flags must be set, and can be repeated 
-for multiple devices and sensors respectively.  The table below maps JSON keys to their matching option:
+All settings in the config file have equivalent command line options.  The ``--devices`` and ``--sensors`` flags are require and can be repeated for multiple devices and sensors respectively.  All other flags are optional.
 
-| JSON Key   | Command Line       |
-|------------|--------------------|
-| devices    | --device           |
-| sensors    | --sensor           |
-| resolution | --width, --height  |
+The table below maps JSON keys to their matching option:
+
+| JSON Key   | Command Line                 | Require |
+|------------|------------------------------|---------|
+| devices    | --device                     | Y       |
+| sensors    | --sensor                     | Y       |
+| resolution | --width, --height            | N       |
+| cloudLogin | --cloud-user, --cloud-passwd | N       |
 
 The JSON configuration from the previous section can equivalently expressed in the command line as follows:
 
 ```bash
 sudo npm start -- --device D4:5E:82:E1:15:01 --device "D5:7B:B9:7D:CE:0E=Demo Unit" \
     --sensor Accelerometer=100.0 --sensor Gyroscope=100.0 --sensor Magnetometer=25.0 \
-    --width 960 --height 540
+    --width 960 --height 540 \
+    --cloud-user foo --cloud-passwd bar
 ```
 
 ## Disable RealTime Graph

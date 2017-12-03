@@ -16,7 +16,7 @@
     "bluetoothle"
   ],
   "author": "MbientLab",
-  "license": "ISC",
+  "license": "LICENSE.md",
   "homepage": "https://bitbucket.org/mbientlab/metabase-hub#readme",
   "dependencies": {
     "argparse": "^1.0.9",
