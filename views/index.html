@@ -117,7 +117,7 @@
 
       setInterval(() => Object.values(states).forEach(s => s['graph'].updateOptions({
         'file': s['data'], 
-        'dateWindow': [s['data'].length - s['maxDataPoints'], s['data'].length] 
+        'dateWindow': [s['data'].length - s['maxDataPoints'] - 1, s['data'].length - 1] 
       }), refesh));
     </script>
   </body>

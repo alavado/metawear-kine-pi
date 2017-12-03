@@ -1,5 +1,5 @@
 var MetaWear = require('metawear');
-const sensorConfig = require('./lib/sensor-config.js');
+const SensorConfig = require('./lib/sensor-config.js');
 var fs = require('fs');
 var path = require('path');
 var util = require("util");
@@ -64,7 +64,7 @@ var config, Session = null;
 if (args['list_sensors'] != null) {
     console.log("Available Sensors")
     console.log("-----------------")
-    Object.keys(sensorConfig).forEach(s => console.log(s))
+    Object.keys(SensorConfig).forEach(s => console.log(s))
     process.exit(0)
 }
 if (args['config'] != null) {
@@ -179,18 +179,18 @@ async function start(options) {
 
             let sensors = [];
             Object.keys(config['sensors']).forEach(s => {
-                if (!(s in sensorConfig)) {
+                if (!(s in SensorConfig)) {
                     winston.warn(util.format("'%s' is not a valid sensor name", s));
-                } else if (!sensorConfig[s].exists(d.board)) {
+                } else if (!SensorConfig[s].exists(d.board)) {
                     winston.warn(util.format("'%s' does not exist on this board", s), { 'mac': d.address });
                 } else {
                     let stream = fs.createWriteStream(path.join(CSV_DIR, util.format("%s_%s_%s.csv", now, d.address.replace(/:/g, ""), s)));
                     let newState = {
                         'stream': stream,
                     }
-                    sensorConfig[s].csvHeader(stream);
-                    MetaWear.mbl_mw_datasignal_subscribe(sensorConfig[s].signal(d.board), MetaWear.FnVoid_DataP.toPointer(pointer => {
-                        sensorConfig[s].writeValue(pointer.deref(), newState);
+                    SensorConfig[s].csvHeader(stream);
+                    MetaWear.mbl_mw_datasignal_subscribe(SensorConfig[s].signal(d.board), MetaWear.FnVoid_DataP.toPointer(pointer => {
+                        SensorConfig[s].writeValue(pointer.deref(), newState);
                     }));
     
                     if (session != null) {
@@ -222,7 +222,7 @@ async function start(options) {
                         config['resolution']['height'] = sizes['height'] / 2
                     }
         
-                    createWindow(d.address, it[1], sensors.map(s => `${s}=${1000 / config["sensors"][s]}`), config['resolution'], x, y)
+                    createWindow(d.address, it[1], sensors.map(s => `${s}=${SensorConfig[s].odrToMs(config["sensors"][s])}`), config['resolution'], x, y)
                     x += config['resolution']['width'];
                     if (x >= sizes['width']) {
                         x = 0;
@@ -235,8 +235,8 @@ async function start(options) {
                     }
                 }
                 for(let s of sensors) {
-                    await sensorConfig[s].configure(d.board, config["sensors"][s]);
-                    sensorConfig[s].start(d.board);
+                    await SensorConfig[s].configure(d.board, config["sensors"][s]);
+                    SensorConfig[s].start(d.board);
                 }
             } else {
                 winston.warn("No sensors were enabled for device", { 'mac': d.address })
