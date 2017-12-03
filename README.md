@@ -45,7 +45,7 @@ Use the ``--list-sensors`` option to print a list of available sensors.
 npm start -- --list-sensors
 ```
 
-## Units
+### Units
 Sampling frequency values are expressed in ``Hz`` except for temperature and humidity which express them in ``seconds``.  For example, the previous JSON snippet will set the 
 sensors to sample at 100.0Hz, 100.0Hz, and 25.0Hz respectively.  However, the below JSON snippet will sample temperature and humidity at 30min and 1hr respectively (1800s / 3600s):  
 
