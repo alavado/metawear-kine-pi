@@ -72,7 +72,7 @@
       }
     </script>
     <script>
-      const refesh = 33
+      const refresh = 33
       const ipc = require('electron').ipcRenderer
       const Dygraph = require('dygraphs');
 
@@ -117,18 +117,36 @@
           graph: graph, 
           data: data,
           maxDataPoints: width * (reference / s[1]),
-          range: config.range.slice()
+          range: config.range.slice(),
+          update: new Date().getTime(),
+          samples: 0
         };
         
         ipc.on(`update-${s[0]}-${params.get('mac')}`, (event, arg) => {
-          states[s[0]]['range'] = arg.reduce((acc, e) => {
+          let state = states[s[0]];
+          state['range'] = arg.reduce((acc, e) => {
             acc[0] = Math.min(e, acc[0])
             acc[1] = Math.max(e, acc[1])
             return acc;
-          }, states[s[0]]['range'])
+          }, state['range'])
           
-          arg.unshift(data.length)
+          arg.unshift(state['samples'])
           data.push(arg)
+          state['samples']+= 1
+
+          if (data.length > state['maxDataPoints']) {
+            data.shift();
+          }
+
+          let now = new Date().getTime()
+          if (now - state['update'] >= refresh) {
+            state['graph'].updateOptions({
+              file: state['data'], 
+              dateWindow: [state['samples'] - state['maxDataPoints'], state['samples']],
+              valueRange: state['range']
+            })
+            state['update'] = now
+          }
         })
       })
 
@@ -136,15 +154,6 @@
         let height = (arg[1] - 20) / sensors.length - 10;
         Object.values(states).forEach(s => s['graph'].resize(arg[0], height));
       })
-      setInterval(() => Object.values(states).forEach(s => {
-        if (s['data'].length != 0) {
-          s['graph'].updateOptions({
-            file: s['data'], 
-            dateWindow: [s['data'].length - s['maxDataPoints'] - 1, s['data'].length - 1],
-            valueRange: s['range']
-          })
-        }
-      }, refesh));
     </script>
   </body>
 </html>
