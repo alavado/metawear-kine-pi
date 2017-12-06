@@ -11,6 +11,7 @@
         position: relative;
         top: -5px;
         margin-bottom: -15px;
+        resize: both;
       }
       .dygraph-axis-label.dygraph-axis-label-y {
         font-size: 12px
@@ -46,7 +47,7 @@
         "Gyroscope" : new GraphSetting(-250.0, 250.0, "gyro", cartesianLabels, cartesianColors, "Degrees per Second (°/s)"),
         "Magnetometer" : new GraphSetting(-0.0003, 0.0003, "mag", cartesianLabels, cartesianColors, "Tesla (T)"),
         "Quaternion" : new GraphSetting(-1.05, 1.05, "quat", [ 'w', 'x', 'y', 'z'], [ 'black', 'red' , 'green', 'blue'], "(1)"),
-        "Euler Angles" : new GraphSetting(-365.0, 365.0, "euler", [ 'pitch', 'roll', 'yaw' ], cartesianColors, "Degrees (°)"),
+        "Euler Angles" : new GraphSetting(-182.5, 365.0, "euler", [ 'pitch', 'roll', 'yaw' ], cartesianColors, "Degrees (°)"),
         "Linear Acceleration" : new GraphSetting(-8.0, 8.0, "lin-acc", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
         "Gravity" : new GraphSetting(-2.05, 2.05, "gravity", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
         "Ambient Light" : new GraphSetting(-10, 1000, "als", [ 'illuminance' ], [ 'magenta' ], "Lux (lx)"),
@@ -56,12 +57,10 @@
       }
     </script>
     <script>
-      function setupGraph(name, width, height) {
-        var realHeight = height - 10;
-
+      function setupGraph(name) {
         var div = document.createElement("div");
         div.setAttribute("id", `chart-${name}`);
-        div.setAttribute("style", `width: ${width}px; height: ${realHeight}px`);
+        div.setAttribute('style', 'width: 100%; resize: both');
         root.appendChild(div);
 
         var legend = document.createElement("div");
@@ -87,7 +86,7 @@
         return [parts[0], parseFloat(parts[1])]
       });
       let width = parseInt(params.get("width"));
-      let height = (parseInt(params.get("height")) - 20) / sensors.length;
+      let height = (parseInt(params.get("height")) - 20) / sensors.length - 12;
       let root = document.getElementById("root");
       const reference = 10
 
@@ -95,8 +94,10 @@
         let config = GraphConfig[s[0]];
 
         var data = []
-        var elements = setupGraph(s[0], width, height);
+        var elements = setupGraph(s[0]);
         var graph = new Dygraph(elements[0], data, {
+          width: width,
+          height: height,
           valueRange: config.range,
           labels: config.labels,
           axes: { 
@@ -113,10 +114,10 @@
         });
 
         states[s[0]] = {
-          'graph': graph, 
-          'data': data,
-          'maxDataPoints': width * (reference / s[1]),
-          'range': config.range.slice()
+          graph: graph, 
+          data: data,
+          maxDataPoints: width * (reference / s[1]),
+          range: config.range.slice()
         };
         
         ipc.on(`update-${s[0]}-${params.get('mac')}`, (event, arg) => {
@@ -131,12 +132,16 @@
         })
       })
 
+      ipc.on(`resize-${params.get('mac')}`, (event, arg) => {
+        let height = (arg[1] - 20) / sensors.length - 10;
+        Object.values(states).forEach(s => s['graph'].resize(arg[0], height));
+      })
       setInterval(() => Object.values(states).forEach(s => {
         if (s['data'].length != 0) {
           s['graph'].updateOptions({
-          'file': s['data'], 
-          'dateWindow': [s['data'].length - s['maxDataPoints'] - 1, s['data'].length - 1],
-          'valueRange': s['range']
+            file: s['data'], 
+            dateWindow: [s['data'].length - s['maxDataPoints'] - 1, s['data'].length - 1],
+            valueRange: s['range']
           })
         }
       }, refesh));
