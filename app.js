@@ -179,7 +179,7 @@ async function start(options) {
         winston.info("Configuring devices")
 
         var now = moment().format("YYYY-MM-DDTHH-mm-ss.SSS");
-        var x = 0, y = 0;
+        var x = -1, y = 0;
         for(let it of devices) {
             let d = it[0]
             var session = null;
@@ -233,14 +233,15 @@ async function start(options) {
                         config['resolution']['height'] = sizes['height'] / 2
                     }
         
+                    if (x < 0) {
+                        x = sizes['width'] - config['resolution']['width'];
+                    }
                     createWindow(d.address, it[1], sensors.map(s => `${s}=${SensorConfig[s].odrToMs(config["sensors"][s])}`), config['resolution'], x, y)
-                    x += config['resolution']['width'];
-                    if (x >= sizes['width']) {
-                        x = 0;
-                        y += config['resolution']['height'];
 
+                    x -= config['resolution']['width'];
+                    if (x < 0) {
+                        y += config['resolution']['height'];
                         if (y >= sizes['height']) {
-                            x = 0;
                             y = 0;
                         }
                     }
