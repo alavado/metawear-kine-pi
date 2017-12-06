@@ -6,6 +6,11 @@ var util = require("util");
 var moment = require("moment");
 var winston = require('winston');
 var ArgumentParser = require('argparse').ArgumentParser;
+var ref = require('ref');
+
+const CACHE_FILENAME = '.cache.json';
+// We save the state of the MetaWear device so that we can download it later
+var cache = fs.existsSync(CACHE_FILENAME) ? JSON.parse(fs.readFileSync(CACHE_FILENAME, 'utf8')) : {};
 
 var parser = new ArgumentParser({
     version: '1.0.0',
@@ -146,12 +151,18 @@ async function start(options) {
                     reject("Failed to initialize SDK");
                 }, 10000);
 
+                var initBuf = undefined;
+                if (cache.hasOwnProperty(device.address)) {
+                  var initStr = cache[device.address];
+                  initBuf = new Buffer(initStr, 'hex');                  
+                }
                 device.connectAndSetUp(error => {
                     clearTimeout(timeout);
                     if (error == null) resolve(device)
                     else reject(error)
-                });
+                }, initBuf);
             });
+            await serializeDeviceState(device)
             
             MetaWear.mbl_mw_settings_set_connection_parameters(device.board, 7.5, 7.5, 0, 6000);
             devices.push([device, 'name' in d ? d['name'] : 'MetaWear']);
@@ -340,4 +351,20 @@ if (args['no_graph'] == null) {
     app.on('ready', () => start(options));
 } else {
     start({});
+}
+
+function serializeDeviceState(device) {
+    var intBuf = ref.alloc(ref.types.uint32);
+    var raw = MetaWear.mbl_mw_metawearboard_serialize(device.board, intBuf);
+    var sizeRead = intBuf.readUInt32LE();
+    var data = ref.reinterpret(raw, sizeRead, 0);
+    var initStr = data.toString('hex');
+    cache[device.address] = initStr;
+
+    return new Promise((resolve, reject) => {
+        fs.writeFile(CACHE_FILENAME, JSON.stringify(cache), err => {
+            if (err) reject(err)
+            else resolve(null)
+        });
+    })
 }
