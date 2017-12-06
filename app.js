@@ -267,7 +267,7 @@ async function start(options) {
                                     });
                                 });
                             } catch (e) {
-                                winston.warn("Could not sync data to metacloud", { 'error': error });
+                                winston.warn("Could not sync data to metacloud", { 'error': e });
                             }
                         }
                         winston.info("Syncing completed");
@@ -304,9 +304,11 @@ if (args['no_graph'] == null) {
             app.quit()
         }
     });
+    /*
     app.on('browser-window-created',function(e,window) {
         window.setMenu(null);
     });
+    */
 
     function createWindow(mac, title, sensors, resolution, x, y) {
         let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);

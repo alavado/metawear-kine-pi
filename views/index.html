@@ -5,11 +5,21 @@
     <link rel="stylesheet" href="../node_modules/dygraphs/dist/dygraph.min.css">
     <style>
       .legend {
+        font-size: 12px;
         padding: 0px 5px 12px;
         transform: translate(+25%);
         position: relative;
         top: -5px;
         margin-bottom: -15px;
+      }
+      .dygraph-axis-label.dygraph-axis-label-y {
+        font-size: 12px
+      }
+      .dygraph-title {
+        font-size: 18px
+      }
+      .dygraph-label.dygraph-ylabel {
+        font-size: 14px
       }
       #root {
         overflow: hidden;
@@ -32,16 +42,16 @@
       }
 
       const GraphConfig = {
-        "Accelerometer": new GraphSetting(-16, 16, "acc", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
-        "Gyroscope" : new GraphSetting(-2100.0, 2100.0, "gyro", cartesianLabels, cartesianColors, "Degrees per Second (°/s)"),
-        "Magnetometer" : new GraphSetting(-0.0025, 0.0025, "mag", cartesianLabels, cartesianColors, "Tesla (T)"),
+        "Accelerometer": new GraphSetting(-8.0, 8.0, "acc", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
+        "Gyroscope" : new GraphSetting(-250.0, 250.0, "gyro", cartesianLabels, cartesianColors, "Degrees per Second (°/s)"),
+        "Magnetometer" : new GraphSetting(-0.0003, 0.0003, "mag", cartesianLabels, cartesianColors, "Tesla (T)"),
         "Quaternion" : new GraphSetting(-1.05, 1.05, "quat", [ 'w', 'x', 'y', 'z'], [ 'black', 'red' , 'green', 'blue'], "(1)"),
         "Euler Angles" : new GraphSetting(-365.0, 365.0, "euler", [ 'pitch', 'roll', 'yaw' ], cartesianColors, "Degrees (°)"),
-        "Linear Acceleration" : new GraphSetting(-16, 16, "lin-acc", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
-        "Gravity" : new GraphSetting(-16, 16, "gravity", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
-        "Ambient Light" : new GraphSetting(-10, 64000, "als", [ 'illuminance' ], [ 'magenta' ], "Lux (lx"),
-        "Pressure" : new GraphSetting(0, 110000, "pressure", [ 'pressure' ], [ 'steelblue'], "Pressure (Pa)"),
-        "Temperature" : new GraphSetting(-45, 130, "temp", [ 'temperature' ], [ '#c05020' ], "Celsius (C)"),
+        "Linear Acceleration" : new GraphSetting(-8.0, 8.0, "lin-acc", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
+        "Gravity" : new GraphSetting(-2.05, 2.05, "gravity", cartesianLabels, cartesianColors, "Gravity of Earth (g)"),
+        "Ambient Light" : new GraphSetting(-10, 1000, "als", [ 'illuminance' ], [ 'magenta' ], "Lux (lx)"),
+        "Pressure" : new GraphSetting(100000, 110000, "pressure", [ 'pressure' ], [ 'steelblue'], "Pressure (Pa)"),
+        "Temperature" : new GraphSetting(20, 30, "temp", [ 'thermistor' ], [ '#c05020' ], "Celsius (C)"),
         "Humidity" : new GraphSetting(-5, 105, "humidity", [ 'relative humidity' ], [ '#30c020' ], "Percent (%)")
       }
     </script>
@@ -86,39 +96,50 @@
 
         var data = []
         var elements = setupGraph(s[0], width, height);
-        var graph = new Dygraph(elements[0], data,
-          {
-            valueRange: config.range,
-            labels: config.labels,
-            axes: { 
-              x: { 
-                drawAxis : false,
-                drawGrid: false
-              }
-            },
-            labelsDiv: elements[1],
-            legend: 'always',
-            title: s[0],
-            ylabel: config.ylabel,
-            colors: config.colors
-          });
+        var graph = new Dygraph(elements[0], data, {
+          valueRange: config.range,
+          labels: config.labels,
+          axes: { 
+            x: { 
+              drawAxis : false,
+              drawGrid: false
+            }
+          },
+          labelsDiv: elements[1],
+          legend: 'always',
+          title: s[0],
+          ylabel: config.ylabel,
+          colors: config.colors
+        });
 
         states[s[0]] = {
           'graph': graph, 
           'data': data,
-          'maxDataPoints': width * (reference / s[1])
+          'maxDataPoints': width * (reference / s[1]),
+          'range': config.range.slice()
         };
         
         ipc.on(`update-${s[0]}-${params.get('mac')}`, (event, arg) => {
+          states[s[0]]['range'] = arg.reduce((acc, e) => {
+            acc[0] = Math.min(e, acc[0])
+            acc[1] = Math.max(e, acc[1])
+            return acc;
+          }, states[s[0]]['range'])
+          
           arg.unshift(data.length)
           data.push(arg)
         })
       })
 
-      setInterval(() => Object.values(states).forEach(s => s['graph'].updateOptions({
-        'file': s['data'], 
-        'dateWindow': [s['data'].length - s['maxDataPoints'] - 1, s['data'].length - 1] 
-      }), refesh));
+      setInterval(() => Object.values(states).forEach(s => {
+        if (s['data'].length != 0) {
+          s['graph'].updateOptions({
+          'file': s['data'], 
+          'dateWindow': [s['data'].length - s['maxDataPoints'] - 1, s['data'].length - 1],
+          'valueRange': s['range']
+          })
+        }
+      }, refesh));
     </script>
   </body>
 </html>
