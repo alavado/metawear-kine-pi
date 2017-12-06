@@ -188,6 +188,7 @@ async function start(options) {
                 sessions.push(session);
             }
 
+            let current_states = []
             let sensors = [];
             Object.keys(config['sensors']).forEach(s => {
                 if (!(s in SensorConfig)) {
@@ -212,6 +213,7 @@ async function start(options) {
                         (data) => windows[d.address].webContents.send(`update-${s}-${d.address}` , data) :
                         (data) => {}
                     
+                    current_states.push(newState)
                     states.push(newState);
                     sensors.push(s);
                 }
@@ -236,7 +238,7 @@ async function start(options) {
                     if (x < 0) {
                         x = sizes['width'] - config['resolution']['width'];
                     }
-                    createWindow(d.address, it[1], sensors.map(s => `${s}=${SensorConfig[s].odrToMs(config["sensors"][s])}`), config['resolution'], x, y)
+                    createWindow(current_states, d.address, it[1], sensors.map(s => `${s}=${SensorConfig[s].odrToMs(config["sensors"][s])}`), config['resolution'], x, y)
 
                     x -= config['resolution']['width'];
                     if (x < 0) {
@@ -308,19 +310,13 @@ if (args['no_graph'] == null) {
     let options = {
         'electron': electron
     }
-    // Quit when all windows are closed.
     app.on('window-all-closed', function () {
-        // On OS X it is common for applications and their menu bar
-        // to stay active until the user quits explicitly with Cmd + Q
-        if (process.platform !== 'darwin') {
-            app.quit()
-        }
     });
     app.on('browser-window-created',function(e,window) {
         window.setMenu(null);
     });
 
-    function createWindow(mac, title, sensors, resolution, x, y) {
+    function createWindow(states, mac, title, sensors, resolution, x, y) {
         let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);
         // Create the browser window.
         let newWindow = new BrowserWindow(attr)
@@ -339,6 +335,8 @@ if (args['no_graph'] == null) {
     
         // Emitted when the window is closed.
         newWindow.on('closed', function () {
+            winston.info("Window closed, data is still being written to the CSV file", { 'mac': mac })
+            states.forEach(s => s['update-graph'] = (data) => {})
             delete windows[mac]
             // Dereference the window object, usually you would store windows
             // in an array if your app supports multi windows, this is the time
