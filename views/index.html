@@ -72,7 +72,7 @@
       }
     </script>
     <script>
-      const refresh = 100
+      const reference = 10
       const ipc = require('electron').ipcRenderer
       const Dygraph = require('dygraphs');
 
@@ -88,7 +88,7 @@
       let width = parseInt(params.get("width"));
       let height = (parseInt(params.get("height")) - 20) / sensors.length - 12;
       let root = document.getElementById("root");
-      const reference = 10
+      let refresh = 1000.0 / parseFloat(params.get("fps"))
 
       sensors.forEach(s => {
         let config = GraphConfig[s[0]];

@@ -62,6 +62,10 @@ parser.addArgument(['--no-graph'], {
     help: 'Disables the real time graph',
     nargs: 0
 });
+parser.addArgument(['--fps'], {
+    help: 'Target frames per second for the realtime graph, defaults to 10fps',
+    type: 'int'
+});
 
 var args = parser.parseArgs();
 var config, Session = null;
@@ -103,10 +107,18 @@ if (args['config'] != null) {
         process.exit(0);
     }
 
+    if (args['fps'] != null) {
+        config['fps'] = args['fps']
+    }
+
     config["resolution"] = {
         "width": args["width"],
         "height": args["height"]
     }
+}
+
+if (!('fps' in config)) {
+    config['fps'] = 10
 }
 
 if ('cloudLogin' in config) {
@@ -117,7 +129,6 @@ const CSV_DIR = args['o'] != null ? args['o'] : "output";
 if (!fs.existsSync(CSV_DIR)){
     fs.mkdirSync(CSV_DIR);
 }
-
 
 function findDevice(mac) {
     return new Promise((resolve, reject) => {
@@ -238,7 +249,7 @@ async function start(options) {
                     if (x < 0) {
                         x = sizes['width'] - config['resolution']['width'];
                     }
-                    createWindow(current_states, d.address, it[1], sensors.map(s => `${s}=${SensorConfig[s].odrToMs(config["sensors"][s])}`), config['resolution'], x, y)
+                    createWindow(current_states, config['fps'], d.address, it[1], sensors.map(s => `${s}=${SensorConfig[s].odrToMs(config["sensors"][s])}`), config['resolution'], x, y)
 
                     x -= config['resolution']['width'];
                     if (x < 0) {
@@ -316,7 +327,7 @@ if (args['no_graph'] == null) {
         window.setMenu(null);
     });
 
-    function createWindow(states, mac, title, sensors, resolution, x, y) {
+    function createWindow(states, fps, mac, title, sensors, resolution, x, y) {
         let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);
         // Create the browser window.
         let newWindow = new BrowserWindow(attr)
@@ -327,7 +338,7 @@ if (args['no_graph'] == null) {
             pathname: path.join(__dirname, 'views', 'index.html'),
             protocol: 'file:',
             slashes: true,
-            search: `mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
+            search: `fps=${fps}&mac=${mac}&sensors=${sensors.join(',')}&width=${resolution['width']}&height=${resolution['height']}`
         }))
     
         // Open the DevTools.
