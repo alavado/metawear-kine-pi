@@ -149,6 +149,48 @@ function findDevice(mac) {
     });
 }
 
+async function connect(device, deserialize) {
+    await new Promise((resolve, reject) => {
+        var timeout = setTimeout(function() {
+            reject("Failed to initialize SDK");
+        }, 10000);
+
+        var initBuf = undefined;
+        if (deserialize && cache.hasOwnProperty(device.address)) {
+          var initStr = cache[device.address];
+          initBuf = new Buffer(initStr, 'hex');                  
+        }
+        device.connectAndSetUp(error => {
+            clearTimeout(timeout);
+            if (error == null) resolve(device)
+            else reject(error)
+        }, initBuf);
+    });
+    MetaWear.mbl_mw_settings_set_connection_parameters(device.board, 7.5, 7.5, 0, 6000);
+}
+
+async function onUnexpectedDisconnect() {
+    winston.warn("Connection lost", { 'mac': this.address});
+    
+    var timeout = 5;
+    var terminate = false;
+    while(!terminate) {
+        try {
+            winston.info("Attempting to reconnect", { 'mac': this.address});
+
+            this._peripheral.removeAllListeners();
+            await connect(this, false);
+
+            winston.info("Reconnected to device", { 'mac': this.address});
+            terminate = true;
+        } catch (e) {
+            winston.info("Failed to reconnect, trying again in " + timeout + "s", { 'mac': this.address });
+            await new Promise((resolve, reject) => setTimeout(() => resolve(null), timeout * 1000))
+            timeout = Math.min(timeout + 10, 60.0);
+        }
+    }
+}
+
 var sessions = [];
 var states = [];
 var devices = [];
@@ -157,25 +199,10 @@ async function start(options) {
         winston.info("Connecting to device", { 'mac': d['mac'] });
         try {
             let device = await findDevice(d['mac']);
-            await new Promise((resolve, reject) => {
-                var timeout = setTimeout(function() {
-                    reject("Failed to initialize SDK");
-                }, 10000);
-
-                var initBuf = undefined;
-                if (cache.hasOwnProperty(device.address)) {
-                  var initStr = cache[device.address];
-                  initBuf = new Buffer(initStr, 'hex');                  
-                }
-                device.connectAndSetUp(error => {
-                    clearTimeout(timeout);
-                    if (error == null) resolve(device)
-                    else reject(error)
-                }, initBuf);
-            });
+            await connect(device, true)
             await serializeDeviceState(device)
             
-            MetaWear.mbl_mw_settings_set_connection_parameters(device.board, 7.5, 7.5, 0, 6000);
+            device.once('disconnect', onUnexpectedDisconnect)
             devices.push([device, 'name' in d ? d['name'] : 'MetaWear']);
         } catch (e) {
             winston.warn(e, {'mac': d['mac']});
@@ -207,7 +234,7 @@ async function start(options) {
                 } else if (!SensorConfig[s].exists(d.board)) {
                     winston.warn(util.format("'%s' does not exist on this board", s), { 'mac': d.address });
                 } else {
-                    let stream = fs.createWriteStream(path.join(CSV_DIR, util.format("%s_%s_%s.csv", now, d.address.replace(/:/g, ""), s)));
+                    let stream = fs.createWriteStream(path.join(CSV_DIR, util.format("%s_%s_%s.csv", now, d.address.toUpperCase().replace(/:/g, ""), s)));
                     let newState = {
                         'stream': stream,
                     }
@@ -275,7 +302,11 @@ async function start(options) {
             process.openStdin().addListener("data", async data => {
                 winston.info("Resetting devices");
                 Promise.all(devices.map(d => {
-                    var task = new Promise((resolve, reject) => d[0].on('disconnect', () => resolve(null)))
+                    if (d[0]._peripheral.state !== 'connected') {
+                        return Promise.resolve(null);
+                    }
+                    d[0].removeListener('disconnect', onUnexpectedDisconnect);
+                    var task = new Promise((resolve, reject) => d[0].once('disconnect', () => resolve(null)))
                     MetaWear.mbl_mw_debug_reset(d[0].board)
                     return task
                 })).then(async results => {
@@ -328,7 +359,7 @@ if (args['no_graph'] == null) {
     });
 
     function createWindow(states, fps, mac, title, sensors, resolution, x, y) {
-        let attr = Object.assign({title: `${title} (${mac})`, x: x, y: y}, resolution);
+        let attr = Object.assign({title: `${title} (${mac.toUpperCase()})`, x: x, y: y}, resolution);
         // Create the browser window.
         let newWindow = new BrowserWindow(attr)
         windows[mac] = newWindow;
