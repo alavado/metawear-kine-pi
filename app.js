@@ -5,69 +5,15 @@ var path = require('path');
 var util = require("util");
 var moment = require("moment");
 var winston = require('winston');
-var ArgumentParser = require('argparse').ArgumentParser;
 var ref = require('ref');
+const CLO = require('./lib/clo.js');
+const BleConn = require('./lib/ble-conn.js')
 
 const CACHE_FILENAME = '.cache.json';
 // We save the state of the MetaWear device so that we can download it later
 var cache = fs.existsSync(CACHE_FILENAME) ? JSON.parse(fs.readFileSync(CACHE_FILENAME, 'utf8')) : {};
 
-var parser = new ArgumentParser({
-    version: '1.0.0',
-    addHelp:true,
-    description: 'NodeJS app to stream sensor data to MetaHub'
-});
-parser.addArgument([ '--device' ], {
-    help: 'MAC address of the device to use',
-    action: 'append',
-    metavar: 'mac',
-    type: "string"
-});
-parser.addArgument([ '--list-sensors' ], {
-    help: 'Show available sensors and frequencies',
-    nargs: 0
-});
-parser.addArgument([ '--sensor' ], {
-    help: 'Key-value pair that sets a sensors sampling frequency',
-    action: 'append',
-    metavar: 'sensor=freq'
-});
-parser.addArgument(['--config'], {
-    help: 'Path to the config file to load',
-    metavar: 'path'
-});
-parser.addArgument(['--cloud-user'], {
-    help: 'MetaCloud user name',
-    metavar: 'name'
-});
-parser.addArgument(['--cloud-passwd'], {
-    help: 'MetaCloud password',
-    metavar: 'pw'
-});
-parser.addArgument(['-o'], {
-    help: 'Path to store the CSV files',
-    metavar: 'path'
-});
-parser.addArgument(['--width'], {
-    help: 'Window width',
-    metavar: 'res',
-    type: 'int'
-});
-parser.addArgument(['--height'], {
-    help: 'Window height',
-    metavar: 'res',
-    type: 'int'
-});
-parser.addArgument(['--no-graph'], {
-    help: 'Disables the real time graph',
-    nargs: 0
-});
-parser.addArgument(['--fps'], {
-    help: 'Target frames per second for the realtime graph, defaults to 10fps',
-    type: 'int'
-});
-
-var args = parser.parseArgs();
+var args = CLO.setup().parseArgs();
 var config, Session = null;
 
 if (args['list_sensors'] != null) {
@@ -131,64 +77,22 @@ if (!fs.existsSync(CSV_DIR)){
 }
 
 function findDevice(mac) {
-    return new Promise((resolve, reject) => {
-        var timeout = setTimeout(function() {
-            MetaWear.stopDiscoverAll(onDiscover);
-            reject("Could not find device");
-        }, 10000);
+  return new Promise((resolve, reject) => {
+    var timeout = setTimeout(() => {
+      MetaWear.stopDiscoverAll(onDiscover);
+      reject("Could not find device");
+    }, 10000);
 
-        function onDiscover(device) {
-            if (device.address.toUpperCase() == mac.toUpperCase()) {
-                MetaWear.stopDiscoverAll(onDiscover);
-                clearTimeout(timeout);
-                resolve(device);
-            }
-        }
-
-        MetaWear.discoverAll(onDiscover);
-    });
-}
-
-async function connect(device, deserialize) {
-    await new Promise((resolve, reject) => {
-        var timeout = setTimeout(function() {
-            reject("Failed to initialize SDK");
-        }, 10000);
-
-        var initBuf = undefined;
-        if (deserialize && cache.hasOwnProperty(device.address)) {
-          var initStr = cache[device.address];
-          initBuf = new Buffer(initStr, 'hex');                  
-        }
-        device.connectAndSetUp(error => {
-            clearTimeout(timeout);
-            if (error == null) resolve(device)
-            else reject(error)
-        }, initBuf);
-    });
-    MetaWear.mbl_mw_settings_set_connection_parameters(device.board, 7.5, 7.5, 0, 6000);
-}
-
-async function onUnexpectedDisconnect() {
-    winston.warn("Connection lost", { 'mac': this.address});
-    
-    var timeout = 5;
-    var terminate = false;
-    while(!terminate) {
-        try {
-            winston.info("Attempting to reconnect", { 'mac': this.address});
-
-            this._peripheral.removeAllListeners();
-            await connect(this, false);
-
-            winston.info("Reconnected to device", { 'mac': this.address});
-            terminate = true;
-        } catch (e) {
-            winston.info("Failed to reconnect, trying again in " + timeout + "s", { 'mac': this.address });
-            await new Promise((resolve, reject) => setTimeout(() => resolve(null), timeout * 1000))
-            timeout = Math.min(timeout + 10, 60.0);
-        }
+    function onDiscover(device) {
+      if (device.address.toUpperCase() == mac.toUpperCase()) {
+        MetaWear.stopDiscoverAll(onDiscover);
+        clearTimeout(timeout);
+        resolve(device);
+      }
     }
+
+    MetaWear.discoverAll(onDiscover);
+  });
 }
 
 var sessions = [];
@@ -199,10 +103,10 @@ async function start(options) {
         winston.info("Connecting to device", { 'mac': d['mac'] });
         try {
             let device = await findDevice(d['mac']);
-            await connect(device, true)
+            await BleConn.connect(device, true, cache);
             await serializeDeviceState(device)
             
-            device.once('disconnect', onUnexpectedDisconnect)
+            device.once('disconnect', BleConn.onUnexpectedDisconnect)
             devices.push([device, 'name' in d ? d['name'] : 'MetaWear']);
         } catch (e) {
             winston.warn(e, {'mac': d['mac']});
@@ -305,7 +209,7 @@ async function start(options) {
                     if (d[0]._peripheral.state !== 'connected') {
                         return Promise.resolve(null);
                     }
-                    d[0].removeListener('disconnect', onUnexpectedDisconnect);
+                    d[0].removeListener('disconnect', BleConn.onUnexpectedDisconnect);
                     var task = new Promise((resolve, reject) => d[0].once('disconnect', () => resolve(null)))
                     MetaWear.mbl_mw_debug_reset(d[0].board)
                     return task
