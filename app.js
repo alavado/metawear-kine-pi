@@ -3,6 +3,7 @@ var winston = require('winston');
 const CLO = require('./lib/clo.js');
 const Stream = require('./lib/command-stream.js')
 const Log = require('./lib/command-log.js')
+const Download = require('./lib/command-download.js')
 
 const CACHE_FILENAME = '.cache.json';
 // We save the state of the MetaWear device so that we can download it later
@@ -72,4 +73,6 @@ if (!('command' in args) || args['command'] === 'stream') {
     Stream(config, args['no_graph'] != null, cache, CACHE_FILENAME);
 } else if (args['command'] === 'log') {
     Log(config, cache, CACHE_FILENAME);
+} else if (args['command'] == 'download') {
+    Download(config, cache, CACHE_FILENAME);
 }
