@@ -71,7 +71,7 @@ if (!fs.existsSync(CSV_DIR)){
 }
 config['csv'] = CSV_DIR
 
-if (!('command' in args) || args['command'] === 'stream') {
+if (args['command'] === null || args['command'] === 'stream') {
     require('./lib/command-stream.js')(config, args['no_graph'] != null, cache, CACHE_FILENAME);
 } else if (args['command'] === 'log') {
     require('./lib/command-log.js')(config, cache, CACHE_FILENAME);
