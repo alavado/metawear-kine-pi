@@ -18,6 +18,11 @@ if (args['list_sensors'] != null) {
 if (args['config'] != null) {
     config = JSON.parse(fs.readFileSync(args['config'], 'utf8'));
     config['devices'] = config['devices'].map(d => typeof(d) === 'string' ? ({'mac': d }) : d)
+    Object.keys(config['sensors']).forEach(k  => {
+        if (typeof(config['sensors'][k]) === 'number') {
+            config['sensors'][k] = {odr: config['sensors'][k]}
+        }
+    })
 } else {
     if (args['device'] != null && args['sensor'] != null) {
         config = {
@@ -27,7 +32,7 @@ if (args['config'] != null) {
             }),
             "sensors": args['sensor'].reduce((acc, s) => {
                 const parts = s.split("=");
-                acc[parts[0]] = parseFloat(parts[1])
+                acc[parts[0]] = isNaN(parts[1]) ? JSON.parse(parts[1]) : {"odr" : parseFloat(parts[1])}
                 return acc
             }, {})
         };
