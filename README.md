@@ -1,4 +1,4 @@
-MetaBase configures [MetaSensor](https://mbientlab.com/store/sensors/) boards to stream data to your MetaHub.  It saves all data to CSV files and can also sync the data to the 
+ MetaBase configures [MetaSensor](https://mbientlab.com/store/sensors/) boards to stream data to your MetaHub.  It saves all data to CSV files and can also sync the data to the 
 [MetaCloud](https://mbientlab.com/store/cloud/) service.  
 
 # Config File
@@ -26,24 +26,39 @@ In the above example, the ``D4:5E:82:E1:15:01`` mac address will have a default 
 the UI window and MetaCloud
 
 ## Sensors
-The ``sensors`` key is an object that defines the sampling frequencies for the various data streams.  Some streams, such as sensor fusion data, are not configurable (but must 
-still have a sampling frequency set), and the app will use the closest valid frequency to the set value.
+The ``sensors`` key is an object that the app uses the configure and enable the various on-board  sensors.  Its keys are the names of the enabled sensors and the values contain the sensor 
+configuration.  
+
+Each sensors have their own configurable parameters, detailed in the below table:
+
+Name                | Parameters                  | Example
+--------------------|-----------------------------|-----------------------------------------
+Accelerometer       | ``odr``, ``range``          | { "odr" : 100.0, "range": 2.0 }
+Gyroscope           | ``odr``, ``range``          | { "odr" : 25.0, "range": 250.0 }
+Magnetometer        | ``odr``                     | { "odr" : 25.0 }
+Quaternion          | ``accRange``, ``gyroRange`` | { "accRange": 2.0, "gyroRange": 250.0 }
+Euler Angles        | ``accRange``, ``gyroRange`` | { "accRange": 4.0, "gyroRange": 500.0 }
+Linear Acceleration | ``accRange``, ``gyroRange`` | { "accRange": 8.0, "gyroRange": 1000.0 }
+Gravity             | ``accRange``, ``gyroRange`` | { "accRange": 16.0, "gyroRange": 2000.0 }
+Ambient Light       | ``odr``, ``gain``           | { "odr": 10.0, gain: 4 }
+Pressure            | ``odr``                     | { "odr": 1.96 }
+Temperature         | ``period``                  | { "period": 1800 }
+Humidity            | ``period``                  | { "period": 3600 }
+
+For example, to sample accelerometer (+/-4g @ 100Hz), gyro (+/-1000 deg/s @ 100Hz), and mag data (25Hz):  
 
 ```json
 {
     "sensors": {
-        "Accelerometer": 100.0,
-        "Gyroscope": 100.0,
-        "Magnetometer": 25.0
+        "Accelerometer": {"odr" : 100.0, "range": 4.0},
+        "Gyroscope": {"odr" : 100.0, "range": 1000.0},
+        "Magnetometer": {"odr" : 25.0}
     }
 }
 ```
 
-Use the ``--list-sensors`` option to print a list of available sensors.
-
-```bash
-npm start -- --list-sensors
-```
+For all sensors, the ``odr`` or ``period`` parameter must be set if applicable.  The app will select default values for the other parameters if not set by the user, and in the case where invalid 
+values are selected, the closest valid value will be used instead.
 
 ### Units
 Sampling frequency values are expressed in ``Hz`` except for temperature and humidity which express them in ``seconds``.  For example, the previous JSON snippet will set the 
@@ -52,11 +67,13 @@ sensors to sample at 100.0Hz, 100.0Hz, and 25.0Hz respectively.  However, the be
 ```json
 {
     "sensors": {
-        "Temperature": 1800.0,
-        "Humidity": 3600.0
+        "Temperature": {"period" : 1800.0 },
+        "Humidity": {"period" : 3600.0 }
     }
 }
 ```
+
+Note that the ``period`` key is used in lieu of ``odr``.
 
 ## MetaCloud Syncing 
 As mentioned in the opening paragraph, this app can also sync to the *MetaCloud* service.  To enable cloud sync, add the ``cloudLogin`` key along with your MetaCloud login 
@@ -85,7 +102,8 @@ screen resolution.
 ```
 
 # Command Line Options
-All settings in the config file have equivalent command line options.  The ``--devices`` and ``--sensors`` flags are require and can be repeated for multiple devices and sensors respectively.  All other flags are optional.
+All settings in the config file have equivalent command line options.  The ``--devices`` and ``--sensors`` flags are require and can be repeated for multiple devices and sensors respectively.  
+All other flags are optional.
 
 The table below maps JSON keys to their matching option:
 
@@ -100,10 +118,22 @@ The JSON configuration from the previous section can equivalently expressed in t
 
 ```bash
 sudo npm start -- --device D4:5E:82:E1:15:01 --device "D5:7B:B9:7D:CE:0E=Demo Unit" \
-    --sensor Accelerometer=100.0 --sensor Gyroscope=100.0 --sensor Magnetometer=25.0 \
+    --sensor Accelerometer='{"odr" : 100.0, "range": 4.0}' \
+    --sensor Gyroscope='{"odr" : 100.0, "range": 1000.0}' \
+    --sensor Magnetometer='{"odr" : 25.0}' \
     --width 960 --height 540 \
     --cloud-user foo --cloud-passwd bar
 ```
+
+## App Commands
+MetaBase can either stream data realtime or log then download data; users control this behavior with the ``--command`` option.  If not set, the app will stream data by default.
+
+```bash
+# configure boards to log data
+sudo npm start -- --config metabase-config.json --command log
+```
+
+Check the help output for a list of available commands.
 
 ## Disable RealTime Graph
 By default, the app will create a window for each connected board and graph the data in real time, one graph per stream.  The realtime graphs can consume a lot of resources 
@@ -112,3 +142,5 @@ so users can disable it by passing in the ``--no-graph`` option in the command l
 ```bash
 sudo npm start -- --config metabase-config.json --no--graph
 ```
+
+This graph is only available when streaming the data.
