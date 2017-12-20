@@ -9,6 +9,21 @@ and sensors defined.
 sudo npm start -- --config metabase-config.json
 ```
 
+## Commands
+The first config option to set is the ``command`` key which controls what the app will do.  You can choose from the following actions:  
+
+Action   | Description
+---------|------------------------------------------------------------------------------------
+stream   | Stream data realtime to the host device, also graphs the data live
+log      | Records data to the on-board flash memory, can download later with any MetaBase app
+download | Retrieves the data from any board setup to record data with a MetaBase app  
+
+```json
+{
+  "command": "stream"
+}
+```
+
 ## Devices
 The ``devices`` key is an array that holds the mac addresses of the devices to use.  The array elements can either be a MAC address string or an object containing both the MAC 
 address string and a user defined name identifying the device.
@@ -107,12 +122,13 @@ All other flags are optional.
 
 The table below maps JSON keys to their matching option:
 
-| JSON Key   | Command Line                 | Require |
-|------------|------------------------------|---------|
-| devices    | --device                     | Y       |
-| sensors    | --sensor                     | Y       |
-| resolution | --width, --height            | N       |
-| cloudLogin | --cloud-user, --cloud-passwd | N       |
+| JSON Key   | Command Line                 | Required |
+|------------|------------------------------|----------|
+| command    | --command                    | N        |
+| devices    | --device                     | Y        |
+| sensors    | --sensor                     | Y        |
+| resolution | --width, --height            | N        |
+| cloudLogin | --cloud-user, --cloud-passwd | N        |
 
 The JSON configuration from the previous section can equivalently expressed in the command line as follows:
 
@@ -122,18 +138,9 @@ sudo npm start -- --device D4:5E:82:E1:15:01 --device "D5:7B:B9:7D:CE:0E=Demo Un
     --sensor Gyroscope='{"odr" : 100.0, "range": 1000.0}' \
     --sensor Magnetometer='{"odr" : 25.0}' \
     --width 960 --height 540 \
-    --cloud-user foo --cloud-passwd bar
+    --cloud-user foo --cloud-passwd bar \
+    --command stream
 ```
-
-## App Commands
-MetaBase can either stream data realtime or log then download data; users control this behavior with the ``--command`` option.  If not set, the app will stream data by default.
-
-```bash
-# configure boards to log data
-sudo npm start -- --config metabase-config.json --command log
-```
-
-Check the help output for a list of available commands.
 
 ## Disable RealTime Graph
 By default, the app will create a window for each connected board and graph the data in real time, one graph per stream.  The realtime graphs can consume a lot of resources 

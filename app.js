@@ -65,16 +65,24 @@ if (!('fps' in config)) {
     config['fps'] = 10
 }
 
+if (!('command' in config)) {
+    config['command'] = args['command'] === null ? 'stream' : args['command']
+}
+
 const CSV_DIR = args['o'] != null ? args['o'] : "output";
 if (!fs.existsSync(CSV_DIR)){
     fs.mkdirSync(CSV_DIR);
 }
 config['csv'] = CSV_DIR
 
-if (args['command'] === null || args['command'] === 'stream') {
-    require('./lib/command-stream.js')(config, args['no_graph'] != null, cache, CACHE_FILENAME);
-} else if (args['command'] === 'log') {
+switch(config['command']) {
+case 'stream':
+    require('./lib/command-stream.js')(config, args['no_graph'] != null, cache, CACHE_FILENAME)
+    break;
+case 'log':
     require('./lib/command-log.js')(config, cache, CACHE_FILENAME);
-} else if (args['command'] == 'download') {
+    break;
+case 'download':
     require('./lib/command-download.js')(config, cache, CACHE_FILENAME);
+    break;
 }
