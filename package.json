@@ -1,6 +1,6 @@
 {
   "name": "metabase-hub",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Stream and log data from MbientLab's sensor boards to your MetaHub",
   "main": "app.js",
   "scripts": {
@@ -21,13 +21,13 @@
   "dependencies": {
     "argparse": "^1.0.9",
     "dygraphs": "^2.0.0",
-    "metacloud": "^0.1.1",
-    "metawear": "^0.1.2",
+    "metacloud": "^0.2.0",
+    "metawear": "^0.2.0",
     "moment": "^2.19.2",
     "winston": "^2.4.0"
   },
   "devDependencies": {
-    "electron": "1.7.9",
+    "electron": "^2.0.5",
     "electron-rebuild": "^1.6.0"
   }
 }
