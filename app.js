@@ -24,21 +24,19 @@ if (args['config'] != null) {
         }
     })
 } else {
-    if (args['device'] != null && args['sensor'] != null) {
-        config = {
-            "devices": args['device'].map(d => {
-                const parts = d.split("=");
-                return parts.length == 1 ? {'mac': d} : {'mac': parts[0], 'name': parts[1]}
-            }),
-            "sensors": args['sensor'].reduce((acc, s) => {
-                const parts = s.split("=");
-                acc[parts[0]] = isNaN(parts[1]) ? JSON.parse(parts[1]) : {"odr" : parseFloat(parts[1])}
-                return acc
-            }, {})
-        };
-    } else {
-        winston.error("either '--config' or '--device' & '--sensor' options must be used");
-        process.exit(0);
+    config = {}
+    if (args['device'] != null) {
+        config["devices"] = args['device'].map(d => {
+            const parts = d.split("=");
+            return parts.length == 1 ? {'mac': d} : {'mac': parts[0], 'name': parts[1]}
+        })
+    }
+    if (args['sensor'] != null) {
+        config["sensors"] = args['sensor'].reduce((acc, s) => {
+            const parts = s.split("=");
+            acc[parts[0]] = isNaN(parts[1]) ? JSON.parse(parts[1]) : {"odr" : parseFloat(parts[1])}
+            return acc
+        }, {})
     }
 
     if (args['cloud_user'] != null && args['cloud_passwd'] != null) {
