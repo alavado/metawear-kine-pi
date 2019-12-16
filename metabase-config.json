@@ -3,7 +3,8 @@
     "devices": [
         "C2:5E:C8:B4:99:E4",
 	"D2:98:7B:51:EA:A1",
-	"D6:FB:AC:46:5F:20"
+	"E9:15:4C:CC:78:08",
+	"DB:79:B9:19:22:6A"
     ],
     "sensors": {
         "Quaternion": {}
